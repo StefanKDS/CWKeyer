@@ -1,131 +1,108 @@
-#include <ezBuzzer.h>
-#include <LiquidCrystal_I2C.h>
 #include <Wire.h>
-#include <ESPRotary.h>
+#include "Rotary.h"
+#include "ESPOLED.h"
 #include <EEPROM.h>
 
 /////////////////////////////////////////////////////////////////
 // DEFINE
 /////////////////////////////////////////////////////////////////
 
-#define ROTARY_PIN1 D3
-#define ROTARY_PIN2 D4
-#define BUZZER_PIN D8
-#define KEYER_SHORT_PIN D6
-#define KEYER_LONG_PIN D7
-#define LED_PIN D5
 
-#define CLICKS_PER_STEP 4   // this number depends on your rotary encoder
-#define MIN_POS         0
-#define MAX_POS         2000
-#define START_POS       250
-#define INCREMENT       50   // this number is the counter increment on each step
+#define ROTARY_PIN1 0
+#define ROTARY_PIN2 2
+#define BUZZER_PIN 15
+#define KEYER_SHORT_PIN 12
+#define KEYER_LONG_PIN 13
+#define MODE_BUTTON_PIN 16
 
-#define BASE_BEEP_TIME 250
-#define BASE_BEEP_PAUSE 250
-
-#define EEPROM_MEM1 1
-#define EEPROM_MEM2 2
-#define EEPROM_SPEED 3
+#define CLICKS_PER_STEP   4 
+#define START_POS 14
+#define STEP_SIZE 1
 
 #define SERIAL_SPEED    115200
+
+#define EEPROM_SIZE     257
+#define EEPROM_WPM_ADDR 0   // 1 byte
+#define EEPROM_MEM1_ADDR 1  // 128 byte
+#define EEPROM_MEM2_ADDR 130   // 128 byte
+
+#define SETUP_MEM_1 1 
+#define SETUP_MEM_2 1 
 
 /////////////////////////////////////////////////////////////////
 // Objects
 /////////////////////////////////////////////////////////////////
 
-ESPRotary rotary;
-LiquidCrystal_I2C lcd(0x3F, 16, 2);
-ezBuzzer buzzer(BUZZER_PIN);
+Rotary r;
+OLED display(4, 5,0x3c,10);
 
 /////////////////////////////////////////////////////////////////
 // Variables
 /////////////////////////////////////////////////////////////////
 
-int speedBeepAddOn = START_POS;
-int beepPause = BASE_BEEP_PAUSE;
-short cwSpeed;
-int addr = 0;
+char beepLong;
+char beepShort;
+char beepPause;
+char wpm = START_POS;
+bool setupMode = false;
 
+byte mem_selection;
 
 /////////////////////////////////////////////////////////////////
 // Setup
 /////////////////////////////////////////////////////////////////
 void setup() {
   Serial.begin(SERIAL_SPEED);
-  delay(50);
+  delay(1000);
 
-  // EEPROM +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   Serial.println("- EEPROM INIT -");
-  EEPROM.begin(512);  //Initialize EEPROM
-
-  // EEPROM AdressTable
-  //
-  // 0-128 Memory 1
-  // 129 - 256 Memory 2
-  // 257 - 258 cwSpeed
+  EEPROM.begin(EEPROM_SIZE);
   
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  byte value;
+  value = EEPROM.read(EEPROM_WPM_ADDR);
+  Serial.print("Read wpm: ");
+  Serial.println(value, DEC);
 
-  // Rotary Encoder Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  rotary.begin(ROTARY_PIN1, ROTARY_PIN2, CLICKS_PER_STEP, MIN_POS, MAX_POS, START_POS, INCREMENT);
-  rotary.setChangedHandler(rotate);
-  rotary.setLeftRotationHandler(showDirection);
-  rotary.setRightRotationHandler(showDirection);
-  rotary.setLowerOverflowHandler(lower);
-  rotary.setUpperOverflowHandler(upper);
-
-  Serial.println("- ROTARY INIT -");
-  Serial.println("\n\nRanged Counter");
-  Serial.println("You can only set values between " + String(MIN_POS) + " and " + String(MAX_POS) +".");
-  Serial.print("Current position: ");
-  Serial.println(rotary.getPosition());
-  Serial.println();
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-  // LCD I2C Init ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- LCD INIT -");
-  /*Serial.println ("I2C scanner. Scanning ...");
-  byte count = 0;
-
-  Wire.begin();
-  for (byte i = 8; i < 120; i++)
+  if(value > 255 || value < 0)
   {
-    Wire.beginTransmission (i);
-    if (Wire.endTransmission () == 0)
-      {
-      Serial.print ("Found address: ");
-      Serial.print (i, DEC);
-      Serial.print (" (0x");
-      Serial.print (i, HEX);
-      Serial.println (")");
-      count++;
-      delay (1);  // maybe unneeded?
-      } // end of good response
-  } // end of for loop
-  Serial.println ("Done.");
-  Serial.print ("Found ");
-  Serial.print (count, DEC);
-  Serial.println (" device(s).");*/
+    wpm = 14;
+  }
+  else
+  {
+    wpm = value;
+  }
+  CalculateTimes(wpm);
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  lcd.init();
-  lcd.clear();         
-  lcd.backlight();
+  // OLED Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  Serial.println("- BUZZER INIT -");
+  // Initialize display
+  display.begin();
 
-  lcd.setCursor(0,0);   //Set cursor to character 2 on line 0
-  lcd.print("CW Keyer v0.1");
-  
+  ShowStdScreen();
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // Rotary Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  r.begin(ROTARY_PIN1, ROTARY_PIN2, CLICKS_PER_STEP);
+  r.setChangedHandler(rotate);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Beep Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   Serial.println("- BUZZER INIT -");
-  buzzer.beep(BASE_BEEP_TIME);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN,0);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Keyer +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   Serial.println("- KEYER INIT -");
-  pinMode(KEYER_SHORT_PIN, INPUT);
-  pinMode(KEYER_LONG_PIN, INPUT);
+  pinMode(KEYER_SHORT_PIN, INPUT_PULLUP);
+  pinMode(KEYER_LONG_PIN, INPUT_PULLUP);
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // Keyer +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  Serial.println("- KEYER INIT -");
+  pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 }
 
@@ -133,117 +110,127 @@ void setup() {
 // Loop
 /////////////////////////////////////////////////////////////////
 void loop() {
-  // Rotary ++++++++++++++++++++++++++++++++++++++
-  rotary.loop();
+  // Encoder +++++++++++++++++++++++++++++++++++++
+  r.loop();
   // +++++++++++++++++++++++++++++++++++++++++++++
 
-  // Keyer +++++++++++++++++++++++++++++++++++++++
-  if( digitalRead(KEYER_SHORT_PIN) )
+  if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == false )
   {
-    buzzer.beep(BASE_BEEP_TIME + speedBeepAddOn);
-    delay(beepPause + speedBeepAddOn);
+    setupMode = true;
+    Serial.println("SetupMode Start");
+    display.clear();
+    display.print("Setup", 0,0);
+
+    delay(250);
   }
 
-  if( digitalRead(KEYER_LONG_PIN) )
+  if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == true )
   {
-    buzzer.beep((BASE_BEEP_TIME * 2) + speedBeepAddOn);
-    delay(beepPause + speedBeepAddOn);
+    setupMode = false;
+    display.clear();
+    ShowStdScreen();
+
+    delay(250);
   }
-  // +++++++++++++++++++++++++++++++++++++++++++++
-}
-
-
-/////////////////////////////////////////////////////////////////
-// Rotary 'OnChange'
-/////////////////////////////////////////////////////////////////
-void rotate(ESPRotary& rotary) {
-   Serial.print("Rotary pos = ");
-   Serial.println(rotary.getPosition());
-   speedBeepAddOn = rotary.getPosition();
-}
-
-/////////////////////////////////////////////////////////////////
-// Rotary 'out of bounds event UPPER'
-/////////////////////////////////////////////////////////////////
-void upper(ESPRotary& rotary) {
-   Serial.println("Rotary upper bound hit");
-}
-
-/////////////////////////////////////////////////////////////////
-// Rotary 'out of bounds event LOWER'
-/////////////////////////////////////////////////////////////////
-void lower(ESPRotary& rotary) {
-   Serial.println("Rotary lower bound hit");
-}
-
-/////////////////////////////////////////////////////////////////
-// Rotary 'on left or right rotation'
-/////////////////////////////////////////////////////////////////
-void showDirection(ESPRotary& rotary) {
-  Serial.print("Rotary direction: ");
-  Serial.println(rotary.directionToString(rotary.getDirection()));
-}
-
-/////////////////////////////////////////////////////////////////
-// Write to EEPROM
-//
-// Beispiel: 
-// short speed;
-// writeToEEPROM(EEPROM_SPEED, reinterpret_cast<char*>(&speed), sizeof(speed));
-/////////////////////////////////////////////////////////////////
-void writeToEEPROM (char type, char* value, int valueSize)
-{
-  int startPos;
   
-  if(type == 1)  //MEM1
+  // Keyer +++++++++++++++++++++++++++++++++++++++
+  if( digitalRead(KEYER_SHORT_PIN) == LOW )
   {
-    startPos = 0;
+    if(setupMode == false)
+    {
+      digitalWrite(BUZZER_PIN,1);
+      delay(beepShort);
+      digitalWrite(BUZZER_PIN,0);
+      delay(beepPause);
+    }
+     else
+    {
+      HandleSetupKeys(KEYER_SHORT_PIN);
+      delay(250);
+    }
   }
-  else if (type ==2) //MEM2
+  else
   {
-    startPos = 129;
-  }
-  else if(type == 3) //CW_SPEED
-  {
-    startPos = 257;
+    digitalWrite(BUZZER_PIN,0);
   }
 
-  for (int i = 0; i < valueSize; i++)
+  if( digitalRead(KEYER_LONG_PIN) == LOW )
   {
-    EEPROM.write(startPos + i, *value);
-    value++;
+     if(setupMode == false)
+    {
+      digitalWrite(BUZZER_PIN,1);
+      delay(beepLong);
+      digitalWrite(BUZZER_PIN,0);
+      delay(beepPause);
+    }
+    else
+    {
+      HandleSetupKeys(KEYER_LONG_PIN);
+     delay(250);
+    }
+  }
+  else
+  {
+    digitalWrite(BUZZER_PIN,0);
   }
 
+ 
+  // +++++++++++++++++++++++++++++++++++++++++++++
+}
+
+void HandleSetupKeys(int key)
+{
+  if(key == KEYER_SHORT_PIN)
+  {
+    Serial.println("KEYER_SHORT_PIN");
+  }
+
+  if(key == KEYER_LONG_PIN)
+  {
+    Serial.println("KEYER_LONG_PIN");
+  }
+}
+
+void ShowStdScreen()
+{
+  display.print("CWKeyer v0.1", 0,0);
+  char string[128];
+  sprintf(string, "Speed: %i WPM", wpm);
+  display.print(string, 4,0);
+}
+
+/////////////////////////////////////////////////////////////////
+/// Rotary 'onChange'
+/////////////////////////////////////////////////////////////////
+void rotate(Rotary& r) {
+   if(r.getDirection() == 1)
+   {
+       wpm += STEP_SIZE;
+   }
+   else
+   {
+     if(wpm > 0)
+     {
+       wpm -= STEP_SIZE;
+     }
+   }
+
+  char string[128];
+  sprintf(string, "Speed: %i WPM", wpm);
+  display.print(string, 4,0);
+
+  CalculateTimes(wpm);
+  EEPROM.write(EEPROM_WPM_ADDR, wpm);
   EEPROM.commit();
 }
 
 /////////////////////////////////////////////////////////////////
-// Read from EEPROM
-//
-// Beispiel: 
-// short speed;
-// readFromEEPROM(EEPROM_SPEED, reinterpret_cast<char*>(&speed), sizeof(speed));
+/// CalculateTimes
 /////////////////////////////////////////////////////////////////
-void readFromEEPROM (char type, char* value, int valueSize)
+void CalculateTimes(char wpm)
 {
-  int startPos;
-  
-  if(type == 1)  //MEM1
-  {
-    startPos = 0;
-  }
-  else if (type ==2) //MEM2
-  {
-    startPos = 129;
-  }
-  else if(type == 3) //CW_SPEED
-  {
-    startPos = 257;
-  }
-
- for (int i = 0; i < valueSize; i++)
-  {
-    *value = EEPROM.read(startPos + i);
-    value++;
-  }
+    char w = 1200 / wpm;
+    beepPause = w; 
+    beepShort = w; 
+    beepLong = 3 * w;
 }
