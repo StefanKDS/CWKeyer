@@ -40,9 +40,9 @@ OLED display(4, 5,0x3c,10);
 // Variables
 /////////////////////////////////////////////////////////////////
 
-char beepLong;
-char beepShort;
-char beepPause;
+short beepLong;
+short beepShort;
+short beepPause;
 char wpm = START_POS;
 bool setupMode = false;
 
@@ -72,7 +72,7 @@ void setup() {
   {
     wpm = value;
   }
-  CalculateTimes(wpm);
+  CalculateTimes(10);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // OLED Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -142,6 +142,7 @@ void loop() {
       delay(beepShort);
       digitalWrite(BUZZER_PIN,0);
       delay(beepPause);
+      Serial.print(".");
     }
      else
     {
@@ -151,7 +152,7 @@ void loop() {
   }
   else
   {
-    digitalWrite(BUZZER_PIN,0);
+     digitalWrite(BUZZER_PIN,0);
   }
 
   if( digitalRead(KEYER_LONG_PIN) == LOW )
@@ -162,11 +163,12 @@ void loop() {
       delay(beepLong);
       digitalWrite(BUZZER_PIN,0);
       delay(beepPause);
+      Serial.print("-");
     }
     else
     {
       HandleSetupKeys(KEYER_LONG_PIN);
-     delay(250);
+      delay(250);
     }
   }
   else
@@ -229,8 +231,18 @@ void rotate(Rotary& r) {
 /////////////////////////////////////////////////////////////////
 void CalculateTimes(char wpm)
 {
-    char w = 1200 / wpm;
+    short w = 1200 / wpm;
     beepPause = w; 
     beepShort = w; 
     beepLong = 3 * w;
+
+    Serial.print("Pause:");
+    Serial.println(beepPause);
+
+    Serial.print("Short:");
+    Serial.println(beepShort);
+
+    Serial.print("Long:");
+    Serial.println(beepLong);
+    
 }
