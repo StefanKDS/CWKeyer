@@ -14,6 +14,7 @@
 #define KEYER_SHORT_PIN 12
 #define KEYER_LONG_PIN 13
 #define MODE_BUTTON_PIN 16
+#define SPEAKER_PIN 14
 
 #define CLICKS_PER_STEP   4 
 #define START_POS 14
@@ -100,10 +101,12 @@ void setup() {
   pinMode(KEYER_LONG_PIN, INPUT_PULLUP);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // Keyer +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // MODE BTN ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   Serial.println("- KEYER INIT -");
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  pinMode(SPEAKER_PIN, OUTPUT);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -138,6 +141,7 @@ void loop() {
   {
     if(setupMode == false)
     {
+      tone(SPEAKER_PIN, 1000, beepShort); 
       digitalWrite(BUZZER_PIN,1);
       delay(beepShort);
       digitalWrite(BUZZER_PIN,0);
@@ -159,6 +163,7 @@ void loop() {
   {
      if(setupMode == false)
     {
+      tone(SPEAKER_PIN, 1000, beepLong);
       digitalWrite(BUZZER_PIN,1);
       delay(beepLong);
       digitalWrite(BUZZER_PIN,0);
