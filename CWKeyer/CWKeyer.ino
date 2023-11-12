@@ -26,13 +26,14 @@
 
 #define SERIAL_SPEED    115200
 
-#define EEPROM_SIZE     257
+#define EEPROM_SIZE     258
 #define EEPROM_WPM_ADDR 0   // 1 byte
 #define EEPROM_MEM1_ADDR 1  // 128 byte
-#define EEPROM_MEM2_ADDR 130   // 128 byte
+#define EEPROM_MEM2_ADDR 129   // 128 byte
+#define EEPROM_SPEAKER_ADDR 258
 
 #define SETUP_MEM_1 1 
-#define SETUP_MEM_2 1 
+#define SETUP_MEM_2 2
 
 /////////////////////////////////////////////////////////////////
 // Objects
@@ -51,6 +52,7 @@ short beepShort;
 short beepPause;
 char wpm = START_POS;
 bool setupMode = false;
+bool speakerOn = true;
 
 byte mem_selection;
 
@@ -113,6 +115,12 @@ void setup() {
 
   ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
   ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
+
+  value = EEPROM.read(EEPROM_SPEAKER_ADDR);
+  Serial.print("Read Speaker setup: ");
+  Serial.println(value, DEC);
+
+  SwitchSpeaker((byte)value);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // WEB SERVER ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -161,7 +169,6 @@ void setup() {
   server.onNotFound(notFound);
 
   server.begin();
-  
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // OLED Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -208,9 +215,8 @@ void loop() {
   if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == false )
   {
     setupMode = true;
+    ShowStdScreen();
     Serial.println("SetupMode Start");
-    display.clear();
-    display.print("Setup", 0,0);
 
     delay(250);
   }
@@ -218,7 +224,6 @@ void loop() {
   if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == true )
   {
     setupMode = false;
-    display.clear();
     ShowStdScreen();
 
     delay(250);
@@ -229,14 +234,9 @@ void loop() {
   {
     if(setupMode == false)
     {
-      tone(SPEAKER_PIN, 1000, beepShort); 
-      digitalWrite(BUZZER_PIN,1);
-      delay(beepShort);
-      digitalWrite(BUZZER_PIN,0);
-      delay(beepPause);
-      Serial.print(".");
+      ProcessBeep(beepShort, '.');
     }
-     else
+    else
     {
       HandleSetupKeys(KEYER_SHORT_PIN);
       delay(250);
@@ -249,14 +249,9 @@ void loop() {
 
   if( digitalRead(KEYER_LONG_PIN) == LOW )
   {
-     if(setupMode == false)
+    if(setupMode == false)
     {
-      tone(SPEAKER_PIN, 1000, beepLong);
-      digitalWrite(BUZZER_PIN,1);
-      delay(beepLong);
-      digitalWrite(BUZZER_PIN,0);
-      delay(beepPause);
-      Serial.print("-");
+      ProcessBeep(beepLong, '_');
     }
     else
     {
@@ -273,6 +268,40 @@ void loop() {
   // +++++++++++++++++++++++++++++++++++++++++++++
 }
 
+/////////////////////////////////////////////////////////////////
+/// SwitchSpeaker
+/////////////////////////////////////////////////////////////////
+void SwitchSpeaker(byte value)
+{
+  if(value == 0)
+    speakerOn = false;
+  else
+    speakerOn = true;
+}
+
+/////////////////////////////////////////////////////////////////
+/// HandleSetupKeys
+/////////////////////////////////////////////////////////////////
+void ProcessBeep(short beepoLength, char outputChar)
+{
+  tone(SPEAKER_PIN, 1000, beepoLength); 
+  if(speakerOn == true)
+  {
+    digitalWrite(BUZZER_PIN,1);
+    delay(beepoLength);
+    digitalWrite(BUZZER_PIN,0);
+    delay(beepPause);
+  }
+  else
+  {
+    delay(beepPause+beepoLength);
+  }
+  Serial.print(outputChar);
+}
+
+/////////////////////////////////////////////////////////////////
+/// HandleSetupKeys
+/////////////////////////////////////////////////////////////////
 void HandleSetupKeys(int key)
 {
   if(key == KEYER_SHORT_PIN)
@@ -286,8 +315,30 @@ void HandleSetupKeys(int key)
   }
 }
 
+/////////////////////////////////////////////////////////////////
+/// ShowSetupScreen
+/////////////////////////////////////////////////////////////////
+void ShowSetupScreen()
+{
+    display.clear();
+    display.print("Setup", 0,0);
+    display.print("Setup", 0,0);
+}
+
+/////////////////////////////////////////////////////////////////
+/// UpdateSetupScreen
+/////////////////////////////////////////////////////////////////
+void UpdateSetupScreen()
+{
+    
+}
+
+/////////////////////////////////////////////////////////////////
+/// ShowStdScreen
+/////////////////////////////////////////////////////////////////
 void ShowStdScreen()
 {
+  display.clear();
   display.print("CWKeyer v0.1", 0,0);
   char string[128];
   sprintf(string, "Speed: %i WPM", wpm);
@@ -310,10 +361,13 @@ void rotate(Rotary& r) {
      }
    }
 
-  char string[128];
-  sprintf(string, "Speed: %i WPM", wpm);
-  display.print(string, 4,0);
-
+  if(setupMode == false)
+  {
+    char string[128];
+    sprintf(string, "Speed: %i WPM", wpm);
+    display.print(string, 4,0);
+  }
+  
   CalculateTimes(wpm);
   EEPROM.write(EEPROM_WPM_ADDR, wpm);
   EEPROM.commit();
@@ -368,7 +422,7 @@ String ReadTextFromEEPROM(byte addr)
   String retVal;
   
   // reading byte-by-byte from EEPROM
-    for (int i = 0; i < 128; i++) {
+    for (int i = addr; i < 128; i++) {
         byte readValue = EEPROM.read(i);
 
         if (readValue == 0) {
@@ -379,7 +433,6 @@ String ReadTextFromEEPROM(byte addr)
         retVal += readValueChar;
     }
 
-    Serial.print("MEM1: ");
     Serial.println(retVal);
 
     return retVal;
