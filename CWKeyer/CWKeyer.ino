@@ -32,8 +32,9 @@
 #define EEPROM_MEM2_ADDR 129   // 128 byte
 #define EEPROM_SPEAKER_ADDR 258
 
-#define SETUP_MEM_1 1 
-#define SETUP_MEM_2 2
+#define SETUP_MEM_1 2 
+#define SETUP_MEM_2 3
+#define SETUP_SPEAKER 1
 
 /////////////////////////////////////////////////////////////////
 // Objects
@@ -54,7 +55,7 @@ char wpm = START_POS;
 bool setupMode = false;
 bool speakerOn = true;
 
-byte mem_selection;
+byte selected_setup_item = SETUP_SPEAKER;
 
 const char* ssid     = "CWKeyer";
 const char* password = "123456789";
@@ -215,7 +216,7 @@ void loop() {
   if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == false )
   {
     setupMode = true;
-    ShowStdScreen();
+    ShowSetupScreen();
     Serial.println("SetupMode Start");
 
     delay(250);
@@ -263,7 +264,6 @@ void loop() {
   {
     digitalWrite(BUZZER_PIN,0);
   }
-
  
   // +++++++++++++++++++++++++++++++++++++++++++++
 }
@@ -277,6 +277,19 @@ void SwitchSpeaker(byte value)
     speakerOn = false;
   else
     speakerOn = true;
+
+  if(setupMode == true)
+  {
+    display.print(">", 2,0);
+    
+    if(speakerOn == true)
+      display.print("Speaker ON ", 2,3);
+    else
+      display.print("Speaker OFF", 2,3);
+  }
+
+  EEPROM.write(EEPROM_SPEAKER_ADDR, speakerOn);
+  EEPROM.commit();
 }
 
 /////////////////////////////////////////////////////////////////
@@ -306,13 +319,46 @@ void HandleSetupKeys(int key)
 {
   if(key == KEYER_SHORT_PIN)
   {
-    Serial.println("KEYER_SHORT_PIN");
+    // NextItem
+    selected_setup_item++;
+    if(selected_setup_item > 3)
+      selected_setup_item = 1;
+
+    display.print(" ", 2,0);
+    display.print(" ", 3,0);
+    display.print(" ", 4,0);
+
+    display.print(">", selected_setup_item+1,0);
   }
 
   if(key == KEYER_LONG_PIN)
   {
-    Serial.println("KEYER_LONG_PIN");
+    if(selected_setup_item == 1)
+    {
+      if(speakerOn == true)
+        SwitchSpeaker(false);
+      else
+        SwitchSpeaker(true);
+    }
+
+    if(selected_setup_item == 2)
+    {
+      PlayMemory(1);
+    }
+
+    if(selected_setup_item == 3)
+    {
+      PlayMemory(2);
+    }
   }
+}
+
+/////////////////////////////////////////////////////////////////
+/// PlayMemory
+/////////////////////////////////////////////////////////////////
+void PlayMemory(byte mem)
+{
+  
 }
 
 /////////////////////////////////////////////////////////////////
@@ -322,7 +368,17 @@ void ShowSetupScreen()
 {
     display.clear();
     display.print("Setup", 0,0);
-    display.print("Speaker ON", 1,0);
+
+    display.print(">", 2,0);
+    
+    if(speakerOn == true)
+      display.print("Speaker ON", 2,3);
+    else
+      display.print("Speaker OFF", 2,3);
+
+    display.print("Play MEM 1", 3,3);
+    display.print("Play MEM 2", 4,3);
+    
 }
 
 /////////////////////////////////////////////////////////////////
@@ -391,7 +447,6 @@ void CalculateTimes(char wpm)
 
     Serial.print("Long:");
     Serial.println(beepLong);
-    
 }
 
 /////////////////////////////////////////////////////////////////
