@@ -1,3 +1,7 @@
+#include <ESP8266WiFi.h>
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+
 #include <Wire.h>
 #include "Rotary.h"
 #include "ESPOLED.h"
@@ -36,6 +40,7 @@
 
 Rotary r;
 OLED display(4, 5,0x3c,10);
+AsyncWebServer server(80);
 
 /////////////////////////////////////////////////////////////////
 // Variables
@@ -49,6 +54,37 @@ bool setupMode = false;
 
 byte mem_selection;
 
+const char* ssid     = "CWKeyer";
+const char* password = "123456789";
+const char* TEXT_1 = "input1";
+const char* TEXT_2 = "input2";
+
+/////////////////////////////////////////////////////////////////
+// HTML Page
+/////////////////////////////////////////////////////////////////
+// HTML web page to handle 3 input fields (input1, input2, input3)
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html><head>
+  <title>CWKeyer v0.1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+  <h1>CWKeyer v0.1</h1>
+  <form action="/get">
+    Text 1: <input type="text" name="input1" maxlength="128">
+    <input type="submit" value="Submit">
+  </form><br>
+  <form action="/get">
+    Text 2: <input type="text" name="input2" maxlength="128">
+    <input type="submit" value="Submit">
+  </form><br>
+</body></html>)rawliteral";
+
+void notFound(AsyncWebServerRequest *request) {
+  request->send(404, "text/plain", "Not found");
+}
+
+
 /////////////////////////////////////////////////////////////////
 // Setup
 /////////////////////////////////////////////////////////////////
@@ -56,7 +92,7 @@ void setup() {
   Serial.begin(SERIAL_SPEED);
   delay(1000);
 
-  // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   Serial.println("- EEPROM INIT -");
   EEPROM.begin(EEPROM_SIZE);
   
@@ -74,6 +110,58 @@ void setup() {
     wpm = value;
   }
   CalculateTimes(wpm);
+
+  ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
+  ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // WEB SERVER ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  WiFi.softAP(ssid, password);
+
+  IPAddress Ip(192, 168, 4, 2);    //setto IP Access Point same as gateway
+  IPAddress NMask(255, 255, 255, 0);
+  WiFi.softAPConfig(Ip, Ip, NMask);
+
+  // Print ESP8266 Local IP Address
+  Serial.println(WiFi.localIP());
+
+  // Send web page with input fields to client
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/html", index_html);
+  });
+
+  // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
+  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    String inputMessage;
+    String inputParam;
+    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
+    if (request->hasParam(TEXT_1)) {
+      // Write TEXT_1 to EEPROM
+      WriteTextToEEPROM(EEPROM_MEM1_ADDR, request->getParam(TEXT_1)->value());
+      
+      //inputMessage = request->getParam(TEXT_1)->value();
+      inputParam = TEXT_1;
+    }
+    // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
+    else if (request->hasParam(TEXT_2)) {
+      // Write TEXT_2 to EEPROM
+      WriteTextToEEPROM(EEPROM_MEM2_ADDR, request->getParam(TEXT_2)->value());
+      
+      //inputMessage = request->getParam(TEXT_2)->value();
+      inputParam = TEXT_2;
+    }
+    else {
+      //inputMessage = "No message sent";
+      inputParam = "none";
+    }
+    Serial.println(inputMessage);
+    request->send(200, "text/html", inputParam + " is saved." +
+                                     "<br><a href=\"/\">Back</a>");
+  });
+  server.onNotFound(notFound);
+
+  server.begin();
+  
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // OLED Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -250,4 +338,49 @@ void CalculateTimes(char wpm)
     Serial.print("Long:");
     Serial.println(beepLong);
     
+}
+
+/////////////////////////////////////////////////////////////////
+/// Write text to EEPROM
+/////////////////////////////////////////////////////////////////
+void WriteTextToEEPROM(byte addr, String text)
+{
+  for (int i = 0; i < text.length(); i++)
+  {
+        EEPROM.write(addr, text[i]);
+        addr += 1;
+  }
+
+  for (int i = addr; i < 128 - text.length(); i++)
+  {
+        EEPROM.write(addr, ' ');
+        addr += 1;
+  }
+  
+  EEPROM.commit();
+}
+
+/////////////////////////////////////////////////////////////////
+/// Read text from EEPROM
+/////////////////////////////////////////////////////////////////
+String ReadTextFromEEPROM(byte addr)
+{
+  String retVal;
+  
+  // reading byte-by-byte from EEPROM
+    for (int i = 0; i < 128; i++) {
+        byte readValue = EEPROM.read(i);
+
+        if (readValue == 0) {
+            break;
+        }
+
+        char readValueChar = char(readValue);
+        retVal += readValueChar;
+    }
+
+    Serial.print("MEM1: ");
+    Serial.println(retVal);
+
+    return retVal;
 }
