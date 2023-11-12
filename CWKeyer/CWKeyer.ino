@@ -343,12 +343,12 @@ void HandleSetupKeys(int key)
 
     if(selected_setup_item == 2)
     {
-      PlayMemory(1);
+      PlayMemory(EEPROM_MEM1_ADDR);
     }
 
     if(selected_setup_item == 3)
     {
-      PlayMemory(2);
+      PlayMemory(EEPROM_MEM2_ADDR);
     }
   }
 }
@@ -356,8 +356,13 @@ void HandleSetupKeys(int key)
 /////////////////////////////////////////////////////////////////
 /// PlayMemory
 /////////////////////////////////////////////////////////////////
-void PlayMemory(byte mem)
+void PlayMemory(byte addr)
 {
+  String text = ReadTextFromEEPROM(addr);
+
+  if(text.length() <= 0)
+    return;
+    
   
 }
 
