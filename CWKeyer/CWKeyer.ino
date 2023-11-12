@@ -322,7 +322,7 @@ void ShowSetupScreen()
 {
     display.clear();
     display.print("Setup", 0,0);
-    display.print("Setup", 0,0);
+    display.print("Speaker ON", 1,0);
 }
 
 /////////////////////////////////////////////////////////////////
