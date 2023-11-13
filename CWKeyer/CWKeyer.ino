@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include "Rotary.h"
 #include "ESPOLED.h"
+#include "MorseCode.h"
 #include <EEPROM.h>
 
 /////////////////////////////////////////////////////////////////
@@ -35,6 +36,10 @@
 #define SETUP_MEM_1 2 
 #define SETUP_MEM_2 3
 #define SETUP_SPEAKER 1
+
+// All morse characters
+#define MORSE_DOT '.'
+#define MORSE_DASH '-'
 
 /////////////////////////////////////////////////////////////////
 // Objects
@@ -363,7 +368,54 @@ void PlayMemory(byte addr)
   if(text.length() <= 0)
     return;
     
-  
+  for (int i=0; i < text.length(); i++)
+  {
+    String encoded =  EncodeChar(text[i]);
+
+    if(encoded.length() > 0)
+    {
+      for (int i=0; i < encoded.length(); i++)
+      {
+        if(encoded[i] == '.')
+        {
+          ProcessBeep(beepShort, encoded[i]);
+        }
+        else if(encoded[i] == '-')
+        {
+          ProcessBeep(beepLong, encoded[i]);
+        }
+        else if(encoded[i] == ' ')
+        {
+           delay(beepPause);
+        }
+      }
+    }
+  }
+}
+
+/////////////////////////////////////////////////////////////////
+/// EncodeChar
+/////////////////////////////////////////////////////////////////
+String EncodeChar(char sign)
+{
+    if (sign >= 'a' && sign <= 'z') 
+    {
+      return MORSE_LETTERS[sign - 'a'];
+    }
+    else if (sign >= 'A' && sign <= 'Z') 
+    {
+      return MORSE_LETTERS[sign - 'A'];
+    }
+    else if (sign >= '0' && sign <= '9') 
+    {
+      return MORSE_NUMBERS[sign - '0'];
+    }
+    else if (sign == ' ') 
+    {
+      return " ";
+    }
+
+    return "";
 }
 
 /////////////////////////////////////////////////////////////////
