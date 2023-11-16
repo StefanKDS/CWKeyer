@@ -324,16 +324,7 @@ void HandleSetupKeys(int key)
 {
   if(key == KEYER_SHORT_PIN)
   {
-    // NextItem
-    selected_setup_item++;
-    if(selected_setup_item > 3)
-      selected_setup_item = 1;
-
-    display.print(" ", 2,0);
-    display.print(" ", 3,0);
-    display.print(" ", 4,0);
-
-    display.print(">", selected_setup_item+1,0);
+  
   }
 
   if(key == KEYER_LONG_PIN)
@@ -439,14 +430,6 @@ void ShowSetupScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// UpdateSetupScreen
-/////////////////////////////////////////////////////////////////
-void UpdateSetupScreen()
-{
-    
-}
-
-/////////////////////////////////////////////////////////////////
 /// ShowStdScreen
 /////////////////////////////////////////////////////////////////
 void ShowStdScreen()
@@ -462,28 +445,40 @@ void ShowStdScreen()
 /// Rotary 'onChange'
 /////////////////////////////////////////////////////////////////
 void rotate(Rotary& r) {
-   if(r.getDirection() == 1)
+   if(setupMode == false)
    {
-       wpm += STEP_SIZE;
-   }
-   else
-   {
-     if(wpm > 0)
-     {
-       wpm -= STEP_SIZE;
-     }
-   }
+    if(r.getDirection() == 1)
+    {
+         wpm += STEP_SIZE;
+    }
+    else
+    {
+      if(wpm > 0)
+      {
+        wpm -= STEP_SIZE;
+      }
+    }
 
-  if(setupMode == false)
-  {
     char string[128];
     sprintf(string, "Speed: %i WPM", wpm);
     display.print(string, 4,0);
-  }
   
-  CalculateTimes(wpm);
-  EEPROM.write(EEPROM_WPM_ADDR, wpm);
-  EEPROM.commit();
+    CalculateTimes(wpm);
+    EEPROM.write(EEPROM_WPM_ADDR, wpm);
+    EEPROM.commit();
+   }
+   else
+   {
+    selected_setup_item++;
+    if(selected_setup_item > 3)
+      selected_setup_item = 1;
+
+    display.print(" ", 2,0);
+    display.print(" ", 3,0);
+    display.print(" ", 4,0);
+
+    display.print(">", selected_setup_item+1,0);
+   }
 }
 
 /////////////////////////////////////////////////////////////////
