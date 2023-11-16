@@ -27,7 +27,7 @@
 
 #define SERIAL_SPEED    115200
 
-#define EEPROM_SIZE     258
+#define EEPROM_SIZE     260
 #define EEPROM_WPM_ADDR 0   // 1 byte
 #define EEPROM_MEM1_ADDR 1  // 128 byte
 #define EEPROM_MEM2_ADDR 129   // 128 byte
@@ -386,7 +386,7 @@ void PlayMemory(byte addr)
         }
         else if(encoded[i] == ' ')
         {
-           delay(beepPause);
+           delay(beepPause*2);
         }
       }
     }
@@ -519,7 +519,7 @@ void WriteTextToEEPROM(byte addr, String text)
 
   for (int i = addr; i < 128 - text.length(); i++)
   {
-        EEPROM.write(addr, ' ');
+        EEPROM.write(addr, '@');
         addr += 1;
   }
   
@@ -542,7 +542,8 @@ String ReadTextFromEEPROM(byte addr)
         }
 
         char readValueChar = char(readValue);
-        retVal += readValueChar;
+        if(readValueChar != '@')
+          retVal += readValueChar;
     }
 
     Serial.println(retVal);
