@@ -1,10 +1,10 @@
 # CWKeyer
 
-A simple CWKeyer for CW-Paddles based on a ESP8266 with WebInterface.
+A simple CWKeyer for CW-Paddles based on a ESP8266 with WebInterface.  
 
-SSID:     CWKeyer
-PW:       123456789
-Address:  192.168.4.2
+SSID:     CWKeyer  
+PW:       123456789  
+Address:  192.168.4.2  
 
 # Features
 
@@ -23,3 +23,8 @@ Address:  192.168.4.2
 # Circuit
 
 ![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Circuit/CWKeyer_Circuit.jpg?raw=true)
+
+# My Keyer
+
+![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Pictures/IMG20231119082627.jpg?raw=true)
+
