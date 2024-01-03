@@ -33,9 +33,30 @@
 #define EEPROM_MEM2_ADDR 129   // 128 byte
 #define EEPROM_SPEAKER_ADDR 258
 
-#define SETUP_MEM_1 2 
-#define SETUP_MEM_2 3
-#define SETUP_SPEAKER 1
+// MENU ////////////////
+#define MAIN_MENU_COUNT 3
+#define MAIN_MENU 1
+#define SETUP 2
+#define CW_KEYER 3
+#define TRAINER 4
+///////////////////////
+
+// SETUP MENU /////////
+#define SETUP_MENU_COUNT 1
+#define SETUP_SPEAKER 21
+///////////////////////
+
+// SETUP CW_KEYER /////////
+#define KEYER_MENU_COUNT 3
+#define SPEED 31 
+#define MEM_1 32
+#define MEM_2 33
+///////////////////////
+
+// TRAINER MENU /////////
+#define TRAINER_MENU_COUNT 3
+#define FIRST 41
+///////////////////////
 
 // All morse characters
 #define MORSE_DOT '.'
@@ -44,7 +65,6 @@
 /////////////////////////////////////////////////////////////////
 // Objects
 /////////////////////////////////////////////////////////////////
-
 Rotary r;
 OLED display(4, 5,0x3c,10);
 AsyncWebServer server(80);
@@ -60,12 +80,17 @@ char wpm = START_POS;
 bool setupMode = false;
 bool speakerOn = true;
 
-byte selected_setup_item = SETUP_SPEAKER;
+bool pause = false;
+
+byte selected_menu_item = SETUP_SPEAKER;
+byte actual_menu = MAIN_MENU;
 
 const char* ssid     = "CWKeyer";
 const char* password = "123456789";
 const char* TEXT_1 = "input1";
 const char* TEXT_2 = "input2";
+
+String decoderString;
 
 /////////////////////////////////////////////////////////////////
 // HTML Page
@@ -241,6 +266,7 @@ void loop() {
     if(setupMode == false)
     {
       ProcessBeep(beepShort, '.');
+      decoderString += ".";
     }
     else
     {
@@ -257,7 +283,8 @@ void loop() {
   {
     if(setupMode == false)
     {
-      ProcessBeep(beepLong, '_');
+      ProcessBeep(beepLong, '-');
+      decoderString += "-";
     }
     else
     {
@@ -268,6 +295,11 @@ void loop() {
   else
   {
     digitalWrite(BUZZER_PIN,0);
+  }
+
+  if((decoderString.length() > 0) && (pause == true))
+  {
+    DecodeMorseCode(decoderString);
   }
  
   // +++++++++++++++++++++++++++++++++++++++++++++
@@ -298,7 +330,7 @@ void SwitchSpeaker(byte value)
 }
 
 /////////////////////////////////////////////////////////////////
-/// HandleSetupKeys
+/// ProcessBeep
 /////////////////////////////////////////////////////////////////
 void ProcessBeep(short beepoLength, char outputChar)
 {
@@ -346,7 +378,37 @@ void HandleSetupKeys(int key)
     {
       PlayMemory(EEPROM_MEM2_ADDR);
     }
+
+    if(selected_setup_item == 4)
+    {
+      StartDecoderMode();
+    }
   }
+}
+
+/////////////////////////////////////////////////////////////////
+/// HandleDecoderModeKeys
+/////////////////////////////////////////////////////////////////
+void HandleDecoderModeKeys(int key)
+{
+  if(key == KEYER_SHORT_PIN)
+  {
+  
+  }
+
+  if(key == KEYER_LONG_PIN)
+  {
+
+  }
+}
+
+/////////////////////////////////////////////////////////////////
+/// StartDecoderMode
+/////////////////////////////////////////////////////////////////
+void StartDecoderMode()
+{
+   display.clear();
+   display.print("DecoderMode", 0,0);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -410,6 +472,34 @@ String EncodeChar(char sign)
 }
 
 /////////////////////////////////////////////////////////////////
+/// DecodeMorseCode
+///////////////////////////////////////////////////////////////// 
+String DecodeMorseCode(String code)
+{
+  Serial.println(code.c_str());
+  
+  for (int i=0; i<26; i++)
+  {
+    if (strcmp( MORSE_LETTERS[i],code.c_str() ) == 0)
+    {
+      Serial.print(LETTERS[i]);
+      return LETTERS[i];
+    }
+  }
+
+  for (int i=0; i<10; i++)
+  {
+    if (strcmp( MORSE_NUMBERS[i], code.c_str()) == 0)
+    {
+      Serial.print(i);
+      return String(i);
+    }
+  }
+  
+  return "";
+}
+
+/////////////////////////////////////////////////////////////////
 /// ShowSetupScreen
 /////////////////////////////////////////////////////////////////
 void ShowSetupScreen()
@@ -426,7 +516,7 @@ void ShowSetupScreen()
 
     display.print("Play MEM 1", 3,3);
     display.print("Play MEM 2", 4,3);
-    
+    display.print("Decoder", 5,3);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -470,7 +560,7 @@ void rotate(Rotary& r) {
    else
    {
     selected_setup_item++;
-    if(selected_setup_item > 3)
+    if(selected_setup_item > 4)
       selected_setup_item = 1;
 
     display.print(" ", 2,0);
