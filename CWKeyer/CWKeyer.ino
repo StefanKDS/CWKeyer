@@ -9,9 +9,24 @@
 #include <EEPROM.h>
 
 /////////////////////////////////////////////////////////////////
-// DEFINE
+// DEKLARATIONEN
 /////////////////////////////////////////////////////////////////
 
+void CalculateTimes(char wpm);
+String ReadTextFromEEPROM(byte addr);
+void SwitchSpeaker(byte value);
+void WriteTextToEEPROM(byte addr, String text);
+void ShowMainScreen();
+void ShowSetupScreen();
+void ShowTrainerScreen();
+void ShowKeyerScreen();
+void rotate(Rotary& r);
+void ReactOnButtonClick();
+void ProcessBeep(short beepoLength, char outputChar);
+
+/////////////////////////////////////////////////////////////////
+// DEFINE
+/////////////////////////////////////////////////////////////////
 
 #define ROTARY_PIN1 0
 #define ROTARY_PIN2 2
@@ -36,26 +51,29 @@
 // MENU ////////////////
 #define MAIN_MENU_COUNT 3
 #define MAIN_MENU 1
-#define SETUP 2
-#define CW_KEYER 3
-#define TRAINER 4
+#define CW_KEYER 2
+#define TRAINER 3
+#define SETUP 4
 ///////////////////////
 
 // SETUP MENU /////////
-#define SETUP_MENU_COUNT 1
+#define SETUP_MENU_COUNT 2
 #define SETUP_SPEAKER 21
+#define BACK 22
 ///////////////////////
 
 // SETUP CW_KEYER /////////
-#define KEYER_MENU_COUNT 3
-#define SPEED 31 
-#define MEM_1 32
-#define MEM_2 33
+#define KEYER_MENU_COUNT 4
+#define MEM_1 31
+#define MEM_2 32
+#define SPEED 33
+#define BACK 34
 ///////////////////////
 
 // TRAINER MENU /////////
-#define TRAINER_MENU_COUNT 3
+#define TRAINER_MENU_COUNT 2
 #define FIRST 41
+#define BACK 42
 ///////////////////////
 
 // All morse characters
@@ -77,7 +95,7 @@ short beepLong;
 short beepShort;
 short beepPause;
 char wpm = START_POS;
-bool setupMode = false;
+bool speed_mode = false;
 bool speakerOn = true;
 
 bool pause = false;
@@ -207,7 +225,7 @@ void setup() {
   // Initialize display
   display.begin();
 
-  ShowStdScreen();
+  ShowMainScreen();
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Rotary Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -243,36 +261,17 @@ void loop() {
   r.loop();
   // +++++++++++++++++++++++++++++++++++++++++++++
 
-  if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == false )
+  // Encoder Button
+  if( digitalRead(MODE_BUTTON_PIN) == LOW )
   {
-    setupMode = true;
-    ShowSetupScreen();
-    Serial.println("SetupMode Start");
-
-    delay(250);
-  }
-
-  if( digitalRead(MODE_BUTTON_PIN) == LOW && setupMode == true )
-  {
-    setupMode = false;
-    ShowStdScreen();
-
-    delay(250);
+    ReactOnButtonClick();
   }
   
   // Keyer +++++++++++++++++++++++++++++++++++++++
   if( digitalRead(KEYER_SHORT_PIN) == LOW )
   {
-    if(setupMode == false)
-    {
-      ProcessBeep(beepShort, '.');
-      decoderString += ".";
-    }
-    else
-    {
-      HandleSetupKeys(KEYER_SHORT_PIN);
-      delay(250);
-    }
+    ProcessBeep(beepShort, '.');
+    decoderString += ".";
   }
   else
   {
@@ -281,28 +280,83 @@ void loop() {
 
   if( digitalRead(KEYER_LONG_PIN) == LOW )
   {
-    if(setupMode == false)
-    {
-      ProcessBeep(beepLong, '-');
-      decoderString += "-";
-    }
-    else
-    {
-      HandleSetupKeys(KEYER_LONG_PIN);
-      delay(250);
-    }
+    ProcessBeep(beepLong, '-');
+    decoderString += "-";
   }
   else
   {
     digitalWrite(BUZZER_PIN,0);
   }
-
-  if((decoderString.length() > 0) && (pause == true))
-  {
-    DecodeMorseCode(decoderString);
-  }
- 
   // +++++++++++++++++++++++++++++++++++++++++++++
+}
+
+/////////////////////////////////////////////////////////////////
+/// ReactOnButtonClick
+/////////////////////////////////////////////////////////////////
+void ReactOnButtonClick()
+{
+  // MAIN_MENU
+  if(actual_menu == MAIN_MENU)
+  {
+    if(selected_menu_item == CW_KEYER)
+      ShowKeyerScreen();
+
+    if(selected_menu_item == SETUP)
+      ShowSetupScreen();
+
+    if(selected_menu_item == TRAINER)
+      ShowTrainerScreen();
+  }
+
+  // CW_KEYER
+  if(actual_menu == CW_KEYER)
+  {
+    if(selected_menu_item == SPEED && speed_mode == false)
+    {
+      speed_mode = true;
+    }
+    else if(selected_menu_item == SPEED && speed_mode == true)
+    {
+      speed_mode = false;
+    }
+
+    if(selected_menu_item == MEM_1)
+      PlayMemory(EEPROM_MEM1_ADDR);
+
+     if(selected_menu_item == MEM_2)
+      PlayMemory(EEPROM_MEM2_ADDR);
+
+    if(selected_menu_item == BACK)
+      ShowMainScreen();
+  }
+
+  // TRAINER
+  if(actual_menu == TRAINER)
+  {
+    if(selected_menu_item == BACK)
+      ShowMainScreen();
+  }
+
+  // SETUP
+  if(actual_menu == SETUP)
+  {
+    if(selected_menu_item == SETUP_SPEAKER)
+    {
+      if(speakerOn == true)
+      {
+        SwitchSpeaker(false);
+        display.print("Speaker ON ", 2,3);
+      }
+      else
+      {
+        SwitchSpeaker(true);
+        display.print("Speaker OFF", 2,3);
+      }
+    }
+    
+    if(selected_menu_item == BACK)
+      ShowMainScreen();
+  }  
 }
 
 /////////////////////////////////////////////////////////////////
@@ -314,16 +368,6 @@ void SwitchSpeaker(byte value)
     speakerOn = false;
   else
     speakerOn = true;
-
-  if(setupMode == true)
-  {
-    display.print(">", 2,0);
-    
-    if(speakerOn == true)
-      display.print("Speaker ON ", 2,3);
-    else
-      display.print("Speaker OFF", 2,3);
-  }
 
   EEPROM.write(EEPROM_SPEAKER_ADDR, speakerOn);
   EEPROM.commit();
@@ -347,68 +391,6 @@ void ProcessBeep(short beepoLength, char outputChar)
     delay(beepPause+beepoLength);
   }
   Serial.print(outputChar);
-}
-
-/////////////////////////////////////////////////////////////////
-/// HandleSetupKeys
-/////////////////////////////////////////////////////////////////
-void HandleSetupKeys(int key)
-{
-  if(key == KEYER_SHORT_PIN)
-  {
-  
-  }
-
-  if(key == KEYER_LONG_PIN)
-  {
-    if(selected_setup_item == 1)
-    {
-      if(speakerOn == true)
-        SwitchSpeaker(false);
-      else
-        SwitchSpeaker(true);
-    }
-
-    if(selected_setup_item == 2)
-    {
-      PlayMemory(EEPROM_MEM1_ADDR);
-    }
-
-    if(selected_setup_item == 3)
-    {
-      PlayMemory(EEPROM_MEM2_ADDR);
-    }
-
-    if(selected_setup_item == 4)
-    {
-      StartDecoderMode();
-    }
-  }
-}
-
-/////////////////////////////////////////////////////////////////
-/// HandleDecoderModeKeys
-/////////////////////////////////////////////////////////////////
-void HandleDecoderModeKeys(int key)
-{
-  if(key == KEYER_SHORT_PIN)
-  {
-  
-  }
-
-  if(key == KEYER_LONG_PIN)
-  {
-
-  }
-}
-
-/////////////////////////////////////////////////////////////////
-/// StartDecoderMode
-/////////////////////////////////////////////////////////////////
-void StartDecoderMode()
-{
-   display.clear();
-   display.print("DecoderMode", 0,0);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -500,75 +482,80 @@ String DecodeMorseCode(String code)
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowSetupScreen
+/// ShowMainScreen
 /////////////////////////////////////////////////////////////////
-void ShowSetupScreen()
+void ShowMainScreen()
 {
-    display.clear();
-    display.print("Setup", 0,0);
-
-    display.print(">", 2,0);
-    
-    if(speakerOn == true)
-      display.print("Speaker ON", 2,3);
-    else
-      display.print("Speaker OFF", 2,3);
-
-    display.print("Play MEM 1", 3,3);
-    display.print("Play MEM 2", 4,3);
-    display.print("Decoder", 5,3);
-}
-
-/////////////////////////////////////////////////////////////////
-/// ShowStdScreen
-/////////////////////////////////////////////////////////////////
-void ShowStdScreen()
-{
+  actual_menu = MAIN_MENU;
   display.clear();
-  display.print("CWKeyer v0.1", 0,0);
+  display.print("CWKeyer v0.2", 0,0);
+
+  display.print(">", 2,0);
+
+  display.print("CW-Keyer", 2,3);
+  display.print("Trainer", 3,3);
+  display.print("Setup", 4,3);
+  
   char string[128];
   sprintf(string, "Speed: %i WPM", wpm);
   display.print(string, 4,0);
 }
 
 /////////////////////////////////////////////////////////////////
-/// Rotary 'onChange'
+/// ShowKeyerScreen
 /////////////////////////////////////////////////////////////////
-void rotate(Rotary& r) {
-   if(setupMode == false)
-   {
-    if(r.getDirection() == 1)
-    {
-         wpm += STEP_SIZE;
-    }
-    else
-    {
-      if(wpm > 0)
-      {
-        wpm -= STEP_SIZE;
-      }
-    }
-
-    char string[128];
-    sprintf(string, "Speed: %i WPM", wpm);
-    display.print(string, 4,0);
+void ShowKeyerScreen()
+{
+  actual_menu = CW_KEYER;
   
-    CalculateTimes(wpm);
-    EEPROM.write(EEPROM_WPM_ADDR, wpm);
-    EEPROM.commit();
-   }
-   else
-   {
-    selected_setup_item++;
-    if(selected_setup_item > 4)
-      selected_setup_item = 1;
+  display.clear();
+  display.print("CW-Keyer", 0,0);
 
-    display.print(" ", 2,0);
-    display.print(" ", 3,0);
-    display.print(" ", 4,0);
+  display.print(">", 2,0);
 
-    display.print(">", selected_setup_item+1,0);
-   }
+  display.print("Mem 1", 2,3);
+  display.print("Mem 2", 3,3);
+  display.print("Mem 1", 4,3);
+  display.print("Back", 5,3);
+
+
+  char string[128];
+  sprintf(string, "Speed: %i WPM", wpm);
+  display.print(string, 6,0);
+}
+
+/////////////////////////////////////////////////////////////////
+/// ShowTrainerScreen
+/////////////////////////////////////////////////////////////////
+void ShowTrainerScreen()
+{
+  actual_menu = TRAINER;
+  
+  display.clear();
+  display.print("Trainer", 0,0);
+
+  display.print(">", 2,0);
+
+  display.print("Back", 2,3);
+}
+
+/////////////////////////////////////////////////////////////////
+/// ShowSetupScreen
+/////////////////////////////////////////////////////////////////
+void ShowSetupScreen()
+{
+  actual_menu = SETUP;
+  display.clear();
+  display.print("Setup", 0,0);
+
+  display.print(">", 2,0);
+    
+  if(speakerOn == true)
+    display.print("Speaker ON", 2,3);
+  else
+    display.print("Speaker OFF", 2,3);
+
+  display.print("Back", 3,3);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -634,4 +621,77 @@ String ReadTextFromEEPROM(byte addr)
     Serial.println(retVal);
 
     return retVal;
+}
+
+/////////////////////////////////////////////////////////////////
+/// Rotary 'onChange'
+/////////////////////////////////////////////////////////////////
+void rotate(Rotary& r) 
+{
+  // Speed einstellen
+  if(actual_menu == CW_KEYER && speed_mode == true)
+  {
+    if(r.getDirection() == 1)
+    {
+         wpm += STEP_SIZE;
+    }
+    else
+    {
+      if(wpm > 0)
+      {
+        wpm -= STEP_SIZE;
+      }
+    }
+
+    char string[128];
+    sprintf(string, "Speed: %i WPM", wpm);
+    display.print(string, 6,0);
+  
+    CalculateTimes(wpm);
+    EEPROM.write(EEPROM_WPM_ADDR, wpm);
+    EEPROM.commit();
+    return;
+  }
+
+  // Menüs durchgehen
+  if(actual_menu == CW_KEYER)
+  {
+    selected_menu_item++;
+    
+    if(selected_menu_item > KEYER_MENU_COUNT)
+      selected_menu_item = 1;
+  }
+
+  if(actual_menu == MAIN_MENU)
+  {
+    selected_menu_item++;
+    
+    if(selected_menu_item > MAIN_MENU_COUNT)
+      selected_menu_item = 1;
+  }
+
+  if(actual_menu == SETUP)
+  {
+    selected_menu_item++;
+    
+    if(selected_menu_item > SETUP_MENU_COUNT)
+      selected_menu_item = 1;
+  }
+  
+  if(actual_menu == TRAINER)
+  {
+    selected_menu_item++;
+    
+    if(selected_menu_item > TRAINER_MENU_COUNT)
+      selected_menu_item = 1;
+  }
+  
+  // Auswahlpfeil überall entfernen
+  display.print(" ", 2,0);
+  display.print(" ", 3,0);
+  display.print(" ", 4,0);
+  display.print(" ", 5,0);
+
+  // Neuen Auswahlpfeil hinzufügen
+  display.print(">", selected_menu_item+1,0);
 }
