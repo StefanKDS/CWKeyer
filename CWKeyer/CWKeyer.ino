@@ -23,6 +23,7 @@ void ShowKeyerScreen();
 void rotate(Rotary& r);
 void ReactOnButtonClick();
 void ProcessBeep(short beepoLength, char outputChar);
+void GroupsOfFive();
 
 /////////////////////////////////////////////////////////////////
 // DEFINE
@@ -42,11 +43,12 @@ void ProcessBeep(short beepoLength, char outputChar);
 
 #define SERIAL_SPEED    115200
 
-#define EEPROM_SIZE     260
+#define EEPROM_SIZE     388
 #define EEPROM_WPM_ADDR 0   // 1 byte
 #define EEPROM_MEM1_ADDR 1  // 128 byte
 #define EEPROM_MEM2_ADDR 129   // 128 byte
-#define EEPROM_SPEAKER_ADDR 258
+#define EEPROM_SPEAKER_ADDR 258  // 1 byte
+#define EEPROM_MEM3_ADDR 259   // 128 byte   
 
 // MENU ////////////////
 #define MAIN_MENU_COUNT 3
@@ -71,8 +73,9 @@ void ProcessBeep(short beepoLength, char outputChar);
 ///////////////////////
 
 // TRAINER MENU /////////
-#define TRAINER_MENU_COUNT 1
-#define TRAINER_BACK 1
+#define TRAINER_MENU_COUNT 2
+#define GROUPS_OF_FIVE 1
+#define TRAINER_BACK 2
 ///////////////////////
 
 // All morse characters
@@ -106,6 +109,7 @@ const char* ssid     = "CWKeyer";
 const char* password = "123456789";
 const char* TEXT_1 = "input1";
 const char* TEXT_2 = "input2";
+const char* TEXT_3 = "input3";
 
 String decoderString;
 
@@ -126,6 +130,10 @@ const char index_html[] PROGMEM = R"rawliteral(
   </form><br>
   <form action="/get">
     Text 2: <input type="text" name="input2" maxlength="128">
+    <input type="submit" value="Submit">
+  </form><br>
+   <form action="/get">
+    Training Characters: <input type="text" name="input3" maxlength="128">
     <input type="submit" value="Submit">
   </form><br>
 </body></html>)rawliteral";
@@ -205,6 +213,14 @@ void setup() {
       
       //inputMessage = request->getParam(TEXT_2)->value();
       inputParam = TEXT_2;
+    }
+    // GET input3 value on <ESP_IP>/get?input3=<inputMessage>
+    else if (request->hasParam(TEXT_3)) {
+      // Write TEXT_3 to EEPROM
+      WriteTextToEEPROM(EEPROM_MEM3_ADDR, request->getParam(TEXT_3)->value());
+      
+      //inputMessage = request->getParam(TEXT_3)->value();
+      inputParam = TEXT_3;
     }
     else {
       //inputMessage = "No message sent";
@@ -358,11 +374,24 @@ void ReactOnButtonClick()
     }
   }
 
+  if(actual_menu == GROUPS_OF_FIVE)
+  {
+    
+  }
+
   // TRAINER
   if(actual_menu == TRAINER)
   {
-     Serial.println("TRAINER");
-     
+    Serial.println("TRAINER");
+
+    if(selected_menu_item == GROUPS_OF_FIVE)
+    {
+      actual_menu = GROUPS_OF_FIVE;
+      Serial.println("Groups of Five");
+      GroupsOfFive();
+      return;
+    }
+    
     if(selected_menu_item == TRAINER_BACK)
     {
       Serial.println("Trainer Back");
@@ -576,7 +605,8 @@ void ShowTrainerScreen()
   display.clear();
   display.print("Trainer", 0,1);
 
-  display.print("Back", 2,4);
+  display.print("Groups of 5", 2,4);
+  display.print("Back", 3,4);
 
   display.print(">", 2,1);
 }
@@ -757,3 +787,47 @@ void rotate(Rotary& r)
     return;
   }
 }
+
+/////////////////////////////////////////////////////////////////
+/// GroupsOfFive
+/////////////////////////////////////////////////////////////////
+void GroupsOfFive()
+{
+  display.clear();
+  display.print("Groups of 5", 0,1);
+  
+  String characters = ReadTextFromEEPROM(EEPROM_MEM3_ADDR);
+
+  if(characters.length() <= 0)
+    return;
+
+  int nbrOfSigns = characters.length();
+
+  for (int i=0; i < 10; i++)
+  {
+    int randomCharacterIndex = random(0,nbrOfSigns);
+    char sign = characters[randomCharacterIndex];
+
+     String encoded =  EncodeChar(sign);
+     for (int i=0; i < encoded.length(); i++)
+     {
+       if(encoded[i] == '.')
+       {
+         ProcessBeep(beepShort, encoded[i]);
+       }
+       else if(encoded[i] == '-')
+       {
+         ProcessBeep(beepLong, encoded[i]);
+       }
+     }
+
+     display.print(&sign, 2, i+1);
+     delay(beepPause*2);
+
+     if(i%5 == 0)
+     {
+       display.print(" ",2,6);
+     }
+  }
+}
+
