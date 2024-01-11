@@ -599,6 +599,8 @@ void ShowSetupScreen()
 
   display.print("Back", 3,4);
 
+  display.print("192.168.4.2", 5,1);
+
   display.print(">", 2,1);
 }
 
