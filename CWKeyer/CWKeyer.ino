@@ -7,6 +7,7 @@
 #include "ESPOLED.h"
 #include "MorseCode.h"
 #include <EEPROM.h>
+#include "Defines.h"
 
 /////////////////////////////////////////////////////////////////
 // DEKLARATIONEN
@@ -23,61 +24,6 @@ void ShowKeyerScreen();
 void rotate(Rotary& r);
 void ReactOnButtonClick();
 void ProcessBeep(short beepoLength, char outputChar);
-
-/////////////////////////////////////////////////////////////////
-// DEFINE
-/////////////////////////////////////////////////////////////////
-
-#define ROTARY_PIN1 0
-#define ROTARY_PIN2 2
-#define BUZZER_PIN 15
-#define KEYER_SHORT_PIN 12
-#define KEYER_LONG_PIN 13
-#define MODE_BUTTON_PIN 16
-#define SPEAKER_PIN 14
-
-#define CLICKS_PER_STEP   4 
-#define START_POS 14
-#define STEP_SIZE 1
-
-#define SERIAL_SPEED    115200
-
-#define EEPROM_SIZE     260
-#define EEPROM_WPM_ADDR 0   // 1 byte
-#define EEPROM_MEM1_ADDR 1  // 128 byte
-#define EEPROM_MEM2_ADDR 129   // 128 byte
-#define EEPROM_SPEAKER_ADDR 258
-
-// MENU ////////////////
-#define MAIN_MENU_COUNT 3
-#define MAIN_MENU 9
-#define CW_KEYER 1
-#define TRAINER 2
-#define SETUP 3
-///////////////////////
-
-// SETUP MENU /////////
-#define SETUP_MENU_COUNT 2
-#define SETUP_SPEAKER 1
-#define SETUP_BACK 2
-///////////////////////
-
-// SETUP CW_KEYER /////////
-#define KEYER_MENU_COUNT 4
-#define MEM_1 1
-#define MEM_2 2
-#define SPEED 3
-#define CW_KEYER_BACK 4
-///////////////////////
-
-// TRAINER MENU /////////
-#define TRAINER_MENU_COUNT 1
-#define TRAINER_BACK 1
-///////////////////////
-
-// All morse characters
-#define MORSE_DOT '.'
-#define MORSE_DASH '-'
 
 /////////////////////////////////////////////////////////////////
 // Objects
@@ -108,6 +54,8 @@ const char* TEXT_1 = "input1";
 const char* TEXT_2 = "input2";
 
 String decoderString;
+
+int State = STATE_IDLE;
 
 /////////////////////////////////////////////////////////////////
 // HTML Page
@@ -263,15 +211,14 @@ void loop() {
   // Encoder Button
   if( digitalRead(MODE_BUTTON_PIN) == LOW )
   {
-    ReactOnButtonClick();
+    StateMachine(MODE_BUTTON_PIN);
     delay(250);
   }
   
   // Keyer +++++++++++++++++++++++++++++++++++++++
   if( digitalRead(KEYER_SHORT_PIN) == LOW )
   {
-    ProcessBeep(beepShort, '.');
-    decoderString += ".";
+    StateMachine(KEYER_SHORT_PIN);
   }
   else
   {
@@ -280,14 +227,52 @@ void loop() {
 
   if( digitalRead(KEYER_LONG_PIN) == LOW )
   {
-    ProcessBeep(beepLong, '-');
-    decoderString += "-";
+     StateMachine(KEYER_LONG_PIN);
   }
   else
   {
     digitalWrite(BUZZER_PIN,0);
   }
+
+  StateMachine(NO_KEY);
   // +++++++++++++++++++++++++++++++++++++++++++++
+}
+
+/////////////////////////////////////////////////////////////////
+/// StateMachine
+/////////////////////////////////////////////////////////////////
+void StateMachine(int key)
+{
+  if(State == STATE_IDLE)
+  {
+    if(key == KEYER_SHORT_PIN)
+    {
+      ProcessBeep(beepShort, '.');
+      decoderString += ".";
+    }
+
+    if(key == KEYER_LONG_PIN)
+    {
+       ProcessBeep(beepLong, '-');
+       decoderString += "-";
+    }
+
+    if(key == MODE_BUTTON_PIN)
+    {
+       ReactOnButtonClick();
+    }
+  }
+  else if(State == STATE_MEM)
+  {
+    if(key == NO_KEY)
+    {
+      
+    }
+  }
+  else if(State == STATE_TRAINER)
+  {
+    
+  }
 }
 
 /////////////////////////////////////////////////////////////////
