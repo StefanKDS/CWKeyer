@@ -19,6 +19,7 @@ void SwitchSpeaker(byte value);
 void WriteTextToEEPROM(byte addr, String text);
 void ShowMainScreen();
 void ShowSetupScreen();
+void ShowMonitorScreen();
 void ShowTrainerScreen();
 void ShowKeyerScreen();
 void rotate(Rotary& r);
@@ -42,6 +43,8 @@ short beepPause;
 char wpm = START_POS;
 bool speed_mode = false;
 bool speakerOn = true;
+double key_activated;
+short char_on_screen = -1;
 
 bool pause = false;
 
@@ -193,11 +196,20 @@ void setup() {
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // MODE BTN ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- KEYER INIT -");
+  Serial.println("- BUTTON INIT -");
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   pinMode(SPEAKER_PIN, OUTPUT);
+}
+
+/////////////////////////////////////////////////////////////////
+// CalcDisplayPosition
+/////////////////////////////////////////////////////////////////
+void CalcDisplayPosition( short chars_on_display, int* r, int* c )
+{
+  *r = chars_on_display / 15;
+  *c = chars_on_display % 15;
 }
 
 /////////////////////////////////////////////////////////////////
@@ -234,6 +246,33 @@ void loop() {
     digitalWrite(BUZZER_PIN,0);
   }
 
+  if(actual_menu == MONITOR)
+  {
+    if((millis() - key_activated) > (beepPause*2) && decoderString != "")
+    {
+      char buffer[5];  // Annahme: Platz für die Zeichenfolge
+      String morseString = DecodeMorseCode(decoderString);
+      morseString.toCharArray(buffer, sizeof(buffer));
+      // 6 x 15 Zeichen sind möglich = 90
+      
+      if(char_on_screen == 90)
+      {
+        char_on_screen = 0;
+        display.clear();
+      }
+      else
+      {
+        char_on_screen++;
+      }
+
+      int r,c;
+      CalcDisplayPosition(char_on_screen, &r, &c);
+
+      display.print(buffer, r,c);
+      decoderString = "";
+    }
+  }
+
   StateMachine(NO_KEY);
   // +++++++++++++++++++++++++++++++++++++++++++++
 }
@@ -249,12 +288,14 @@ void StateMachine(int key)
     {
       ProcessBeep(beepShort, '.');
       decoderString += ".";
+      key_activated = millis();
     }
 
     if(key == KEYER_LONG_PIN)
     {
        ProcessBeep(beepLong, '-');
        decoderString += "-";
+       key_activated = millis();
     }
 
     if(key == MODE_BUTTON_PIN)
@@ -296,6 +337,13 @@ void ReactOnButtonClick()
     {
       Serial.println("ShowSetupScreen");
       ShowSetupScreen();
+      return;
+    }
+
+    if(selected_menu_item == MONITOR)
+    {
+      Serial.println("ShowMonitorScreen");
+      ShowMonitorScreen();
       return;
     }
 
@@ -354,6 +402,14 @@ void ReactOnButtonClick()
       ShowMainScreen();
       return;
     }
+  }
+
+  // MONITOR
+  if(actual_menu == MONITOR)
+  {
+    Serial.println("MONITOR");
+    ShowMainScreen();
+    return;
   }
 
   // SETUP
@@ -487,8 +543,6 @@ String EncodeChar(char sign)
 ///////////////////////////////////////////////////////////////// 
 String DecodeMorseCode(String code)
 {
-  Serial.println(code.c_str());
-  
   for (int i=0; i<26; i++)
   {
     if (strcmp( MORSE_LETTERS[i],code.c_str() ) == 0)
@@ -507,7 +561,7 @@ String DecodeMorseCode(String code)
     }
   }
   
-  return "";
+  return "*";
 }
 
 /////////////////////////////////////////////////////////////////
@@ -518,11 +572,12 @@ void ShowMainScreen()
   actual_menu = MAIN_MENU;
   selected_menu_item = 1;
   display.clear();
-  display.print("CWKeyer v0.2", 0,1);
+  display.print("CWKeyer v0.3", 0,1);
 
   display.print("CW-Keyer", 2,4);
-  display.print("Trainer", 3,4);
-  display.print("Setup", 4,4);
+  display.print("Monitor", 3,4);
+  display.print("Trainer", 4,4);
+  display.print("Setup", 5,4);
 
    display.print(">", 2,1);
 }
@@ -587,6 +642,19 @@ void ShowSetupScreen()
   display.print("192.168.4.2", 5,1);
 
   display.print(">", 2,1);
+}
+
+/////////////////////////////////////////////////////////////////
+/// ShowSetupScreen
+/////////////////////////////////////////////////////////////////
+void ShowMonitorScreen()
+{
+  actual_menu = MONITOR;
+  selected_menu_item = 1;
+  display.clear();
+
+  // 
+
 }
 
 /////////////////////////////////////////////////////////////////
@@ -661,6 +729,7 @@ void DisplaySelectionArrow()
   display.print(" ", 3,1);
   display.print(" ", 4,1);
   display.print(" ", 5,1);
+  display.print(" ", 6,1);
 
   // Neuen Auswahlpfeil hinzufügen
   display.print(">", selected_menu_item+1,1 );
@@ -687,7 +756,7 @@ void rotate(Rotary& r)
     }
 
     char string[128];
-    sprintf(string, "  %i WPM", wpm);
+    sprintf(string, "Speed: %i WPM", wpm);
     display.print(string, 6,1);
   
     CalculateTimes(wpm);
@@ -710,10 +779,19 @@ void rotate(Rotary& r)
 
   if(actual_menu == MAIN_MENU)
   {
-    selected_menu_item++;
+    if(r.getDirection() == 1)
+    {
+      selected_menu_item++;
     
-    if(selected_menu_item > MAIN_MENU_COUNT)
-      selected_menu_item = 1;
+      if(selected_menu_item > MAIN_MENU_COUNT)
+        selected_menu_item = 1;
+    }
+    else
+    {
+      selected_menu_item--;
+      if(selected_menu_item < 1)
+        selected_menu_item = MAIN_MENU_COUNT;
+    }
 
     DisplaySelectionArrow();
     

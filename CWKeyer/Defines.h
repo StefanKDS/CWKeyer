@@ -31,11 +31,12 @@
 ///////////////////////
 
 // MENU ////////////////
-#define MAIN_MENU_COUNT 3
+#define MAIN_MENU_COUNT 4
 #define MAIN_MENU 9
 #define CW_KEYER 1
-#define TRAINER 2
-#define SETUP 3
+#define MONITOR 2
+#define TRAINER 3
+#define SETUP 4
 ///////////////////////
 
 // SETUP MENU /////////
