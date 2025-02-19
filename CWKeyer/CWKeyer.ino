@@ -651,6 +651,7 @@ void ShowMonitorScreen()
 {
   actual_menu = MONITOR;
   selected_menu_item = 1;
+  char_on_screen = 0;
   display.clear();
 
   // 
