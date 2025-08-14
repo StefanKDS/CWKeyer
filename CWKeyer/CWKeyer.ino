@@ -58,6 +58,9 @@ const char* TEXT_1 = "input1";
 const char* TEXT_2 = "input2";
 
 String decoderString;
+String selectedLetters = ""; // Globale Variable für die Auswahl
+int activeTrainerLetterCount = 26;
+bool showTrainerFeedback;
 
 int State = STATE_IDLE;
 
@@ -68,6 +71,19 @@ void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
 
+String generateLetterCheckboxes() {
+  String html = "";
+  for (int i = 0; i < 26; i++) {
+    String letter = LETTERS[i];
+    bool checked = selectedLetters.indexOf(letter) != -1;
+    html += "<input type='checkbox' name='letters' value='" + letter + "' id='l" + String(i) + "'";
+    if (checked) html += " checked";
+    html += ">";
+    html += "<label for='l" + String(i) + "'>" + letter + "</label> ";
+    if ((i+1) % 7 == 0) html += "<br>";
+  }
+  return html;
+}
 
 /////////////////////////////////////////////////////////////////
 // Setup
@@ -103,6 +119,8 @@ void setup() {
   Serial.println(value, DEC);
 
   SwitchSpeaker((byte)value);
+
+  selectedLetters = ReadTextFromEEPROM(0x40); // Auswahl laden
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // WEB SERVER ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -114,6 +132,28 @@ void setup() {
 
   // Print ESP8266 Local IP Address
   Serial.println(WiFi.localIP());
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  String page = index_html;
+  page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
+  request->send_P(200, "text/html", page.c_str());
+  });
+
+  server.on("/save_letters", HTTP_GET, [](AsyncWebServerRequest *request){
+  String selected = "";
+  if (request->hasParam("letters")) {
+    int params = request->params();
+    for (int i = 0; i < params; i++) {
+      AsyncWebParameter* p = request->getParam(i);
+      if (p->name() == "letters") {
+        selected += p->value();
+      }
+    }
+    WriteTextToEEPROM(0x40, selected);
+    selectedLetters = selected; // Auswahl aktualisieren
+  }
+  request->send(200, "text/html", "Gespeichert: " + selected + "<br><a href=\"/\">Zurück</a>");
+  });
 
   // Send web page with input fields to client
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -379,6 +419,20 @@ void ReactOnButtonClick()
   {
      Serial.println("TRAINER");
      
+    if (selected_menu_item == TRAINER_HEAR)
+    {
+      Serial.println("Trainer Hear");
+      ShowTrainerHearScreen();
+      return;
+    }
+
+    if (selected_menu_item == TRAINER_GIVE)
+    {
+      Serial.println("Trainer Give");
+      ShowTrainerGiveScreen();
+      return;
+    }
+
     if(selected_menu_item == TRAINER_BACK)
     {
       Serial.println("Trainer Back");
@@ -386,7 +440,6 @@ void ReactOnButtonClick()
       return;
     }
   }
-
   // MONITOR
   if(actual_menu == MONITOR)
   {
@@ -598,10 +651,41 @@ void ShowTrainerScreen()
   
   display.clear();
   display.print("Trainer", 0,1);
+  display.print("Hören", 2,4);
+  display.print("Geben", 3,4);
 
-  display.print("Back", 2,4);
+  display.print("Back", 4,4);
 
   display.print(">", 2,1);
+}
+
+/////////////////////////////////////////////////////////////////
+/// ShowTrainerHearScreen
+/////////////////////////////////////////////////////////////////
+void ShowTrainerHearScreen()
+{
+
+}
+
+/////////////////////////////////////////////////////////////////
+/// ShowTrainerGiveScreen
+/////////////////////////////////////////////////////////////////
+void ShowTrainerGiveScreen()
+{
+  actual_menu = TRAINER_GIVE_SCREEN;
+  selected_menu_item = 1;
+  display.clear();
+
+  // Zufälligen Buchstaben aus aktiver Liste wählen
+  int idx = random(0, selectedLetters.length());
+  char currentTrainerLetter = selectedLetters[idx];
+
+  // Buchstaben anzeigen
+  char buf[2] = { currentTrainerLetter, '\0' };
+  display.print(buf, 4, 7);
+
+  decoderString = "";
+  showTrainerFeedback = false;
 }
 
 /////////////////////////////////////////////////////////////////

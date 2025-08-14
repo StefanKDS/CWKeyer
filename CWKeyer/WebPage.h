@@ -106,13 +106,11 @@ const char index_html[] PROGMEM = R"rawliteral(
       <input type="submit" value="Speichern">
     </form>
     <h2>Trainer Letters</h2>
-    <form action="/letters" method="get">
-      <fieldset>
-        <legend>Buchstaben auswählen:</legend>
-        %LETTERS_CHECKBOXES%
-      </fieldset>
-      <input type="submit" value="Speichern">
-    </form>
+    <form action="/save_letters" method="get">
+  %LETTERS_CHECKBOXES%
+  <br>
+  <input type="submit" value="Speichern">
+</form>
   </div>
 </body>
 </html>

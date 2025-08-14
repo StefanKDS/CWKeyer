@@ -37,6 +37,8 @@
 #define MONITOR 2
 #define TRAINER 3
 #define SETUP 4
+
+#define TRAINER_GIVE_SCREEN 10
 ///////////////////////
 
 // SETUP MENU /////////
@@ -54,8 +56,10 @@
 ///////////////////////
 
 // TRAINER MENU /////////
-#define TRAINER_MENU_COUNT 1
-#define TRAINER_BACK 1
+#define TRAINER_MENU_COUNT 3
+#define TRAINER_HEAR 1
+#define TRAINER_GIVE 2
+#define TRAINER_BACK 3
 ///////////////////////
 
 // All morse characters
