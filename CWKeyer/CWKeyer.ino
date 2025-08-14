@@ -1,6 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include "WebPage.h"
 
 #include <Wire.h>
 #include "Rotary.h"
@@ -63,24 +64,6 @@ int State = STATE_IDLE;
 /////////////////////////////////////////////////////////////////
 // HTML Page
 /////////////////////////////////////////////////////////////////
-// HTML web page to handle 3 input fields (input1, input2, input3)
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html><head>
-  <title>CWKeyer v0.1</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  </head>
-  <body>
-  <h1>CWKeyer v0.1</h1>
-  <form action="/get">
-    Text 1: <input type="text" name="input1" maxlength="128">
-    <input type="submit" value="Submit">
-  </form><br>
-  <form action="/get">
-    Text 2: <input type="text" name="input2" maxlength="128">
-    <input type="submit" value="Submit">
-  </form><br>
-</body></html>)rawliteral";
-
 void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
