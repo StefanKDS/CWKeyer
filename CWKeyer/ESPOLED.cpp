@@ -100,7 +100,10 @@ static const char myFont[][8] PROGMEM = {
 {0x00,0x00,0x7F,0x00,0x00,0x00,0x00,0x00},
 {0x00,0x41,0x36,0x08,0x00,0x00,0x00,0x00},
 {0x00,0x02,0x01,0x01,0x02,0x01,0x00,0x00},
-{0x00,0x02,0x05,0x05,0x02,0x00,0x00,0x00} 
+{0x00,0x02,0x05,0x05,0x02,0x00,0x00,0x00},
+{0x20,0x54,0x54,0x78,0x54,0x00,0x00,0x00}, // ä
+{0x38,0x44,0x44,0x38,0x44,0x28,0x00,0x00}, // ö
+{0x3C,0x40,0x40,0x3C,0x40,0x28,0x00,0x00} // ü 
 };
 
 
@@ -213,18 +216,47 @@ void OLED::sendStr(unsigned char *string)
 //==========================================================//
 // Prints a string in coordinates X Y, being multiples of 8.
 // This means we have 16 COLS (0-15) and 8 ROWS (0-7).
-void OLED::sendStrXY( const char *string, int X, int Y)
+void OLED::sendStrXY(const char *string, int X, int Y)
 {
-  setXY(X,Y);
-  unsigned char i=0;
-  while(*string)
-  {
-    for(i=0;i<8;i++)
+    setXY(X, Y);
+    unsigned char i = 0;
+
+    while (*string)
     {
-      SendChar(pgm_read_byte(myFont[*string-0x20]+i));
+        uint8_t fontIndex = 0;
+
+        // Prüfe auf UTF-8 Umlaute (ä, ö, ü)
+        if ((unsigned char)*string == 0xC3)  // UTF-8 Prefix für Umlaute
+        {
+            string++; // zum zweiten Byte der UTF-8 Sequenz
+
+            if ((unsigned char)*string == 0xA4) // ä
+                fontIndex = sizeof(myFont) / 8 - 3;
+            else if ((unsigned char)*string == 0xB6) // ö
+                fontIndex = sizeof(myFont) / 8 - 2;
+            else if ((unsigned char)*string == 0xBC) // ü
+                fontIndex = sizeof(myFont) / 8 - 1;
+            else
+                fontIndex = 0; // unbekannt → Leerzeichen
+        }
+        else if ((unsigned char)*string >= 0x20 && (unsigned char)*string <= 0x7F)
+        {
+            // Normale ASCII-Zeichen
+            fontIndex = *string - 0x20;
+        }
+        else
+        {
+            fontIndex = 0; // Platzhalter
+        }
+
+        // Zeichen aus Font ausgeben
+        for (i = 0; i < 8; i++)
+        {
+            SendChar(pgm_read_byte(myFont[fontIndex] + i));
+        }
+
+        string++; // zum nächsten Zeichen
     }
-    *string++;
-  }
 }
 
 

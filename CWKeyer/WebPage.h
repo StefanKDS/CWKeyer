@@ -91,7 +91,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div class="container">
-    <h1>CWKeyer v0.1</h1>
+    <h1>CWKeyer v0.4</h1>
     <h2>Memory</h2>
     <form action="/get">
       <label>Text 1:

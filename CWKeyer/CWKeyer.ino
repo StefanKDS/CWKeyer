@@ -59,8 +59,8 @@ const char* TEXT_2 = "input2";
 
 String decoderString;
 String selectedLetters = ""; // Globale Variable für die Auswahl
-int activeTrainerLetterCount = 26;
 bool showTrainerFeedback;
+char currentTrainerLetter;
 
 int State = STATE_IDLE;
 
@@ -144,7 +144,7 @@ void setup() {
   if (request->hasParam("letters")) {
     int params = request->params();
     for (int i = 0; i < params; i++) {
-      AsyncWebParameter* p = request->getParam(i);
+      const AsyncWebParameter* p = request->getParam(i);
       if (p->name() == "letters") {
         selected += p->value();
       }
@@ -296,6 +296,30 @@ void loop() {
     }
   }
 
+  if(actual_menu == TRAINER_GIVE_SCREEN)
+  {
+    if((millis() - key_activated) > (beepPause*2) && decoderString != "")
+    {
+      char buffer[5];  // Annahme: Platz für die Zeichenfolge
+      String morseString = DecodeMorseCode(decoderString);
+      morseString.toCharArray(buffer, sizeof(buffer));
+      // 6 x 15 Zeichen sind möglich = 90
+      
+      if(buffer[0] == currentTrainerLetter)
+      {
+         display.clear();
+         display.print("Correct !",4,4);
+      }
+      else
+      {
+         display.clear();
+         display.print("Not Correct !",4,2);
+      }
+       delay(2000);
+       ShowTrainerGiveScreen();
+    }
+  }
+
   StateMachine(NO_KEY);
   // +++++++++++++++++++++++++++++++++++++++++++++
 }
@@ -443,7 +467,12 @@ void ReactOnButtonClick()
   // MONITOR
   if(actual_menu == MONITOR)
   {
-    Serial.println("MONITOR");
+    ShowMainScreen();
+    return;
+  }
+
+  if(actual_menu == TRAINER_GIVE_SCREEN)
+  {
     ShowMainScreen();
     return;
   }
@@ -458,14 +487,14 @@ void ReactOnButtonClick()
       if(speakerOn == true)
       {
         SwitchSpeaker(false);
-        display.print("Speaker ON ", 2,3);
-        Serial.println("Speaker ON");
+        display.print("Speaker OFF", 2,4);
+        Serial.println("Speaker OFF");
       }
       else
       {
         SwitchSpeaker(true);
-        display.print("Speaker OFF", 2,3);
-        Serial.println("Speaker OFF");
+        display.print("Speaker ON ", 2,4);
+        Serial.println("Speaker ON ");
       }
 
       return;
@@ -520,6 +549,8 @@ void ProcessBeep(short beepoLength, char outputChar)
 void PlayMemory(byte addr)
 {
   String text = ReadTextFromEEPROM(addr);
+
+  Serial.println(text);
 
   if(text.length() <= 0)
     return;
@@ -608,7 +639,7 @@ void ShowMainScreen()
   actual_menu = MAIN_MENU;
   selected_menu_item = 1;
   display.clear();
-  display.print("CWKeyer v0.3", 0,1);
+  display.print("CWKeyer v0.4", 0,1);
 
   display.print("CW-Keyer", 2,4);
   display.print("Monitor", 3,4);
@@ -638,7 +669,7 @@ void ShowKeyerScreen()
 
   char string[128];
   sprintf(string, "Speed: %i WPM", wpm);
-  display.print(string, 6,1);
+  display.print(string, 6,2);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -651,8 +682,8 @@ void ShowTrainerScreen()
   
   display.clear();
   display.print("Trainer", 0,1);
-  display.print("Hören", 2,4);
-  display.print("Geben", 3,4);
+  display.print("Hear", 2,4);
+  display.print("Give", 3,4);
 
   display.print("Back", 4,4);
 
@@ -678,7 +709,10 @@ void ShowTrainerGiveScreen()
 
   // Zufälligen Buchstaben aus aktiver Liste wählen
   int idx = random(0, selectedLetters.length());
-  char currentTrainerLetter = selectedLetters[idx];
+  currentTrainerLetter = selectedLetters[idx];
+
+  Serial.println(selectedLetters);
+  Serial.println(currentTrainerLetter);
 
   // Buchstaben anzeigen
   char buf[2] = { currentTrainerLetter, '\0' };
@@ -706,7 +740,7 @@ void ShowSetupScreen()
 
   display.print("Back", 3,4);
 
-  display.print("192.168.4.2", 5,1);
+  display.print("192.168.4.2", 5,4);
 
   display.print(">", 2,1);
 }
@@ -752,16 +786,17 @@ void WriteTextToEEPROM(byte addr, String text)
 {
   for (int i = 0; i < text.length(); i++)
   {
-        EEPROM.write(addr, text[i]);
-        addr += 1;
+    EEPROM.write(addr, text[i]);
+    addr += 1;
   }
+  EEPROM.write(addr, 0); // Nullterminator schreiben
+  addr += 1;
 
-  for (int i = addr; i < 128 - text.length(); i++)
+  // Optional: Rest mit '@' auffüllen (nicht zwingend nötig)
+  for (int i = addr; i < 128; i++)
   {
-        EEPROM.write(addr, '@');
-        addr += 1;
+    EEPROM.write(i, '@');
   }
-  
   EEPROM.commit();
 }
 
@@ -771,23 +806,15 @@ void WriteTextToEEPROM(byte addr, String text)
 String ReadTextFromEEPROM(byte addr)
 {
   String retVal;
-  
-  // reading byte-by-byte from EEPROM
-    for (int i = addr; i < 128; i++) {
-        byte readValue = EEPROM.read(i);
-
-        if (readValue == 0) {
-            break;
-        }
-
-        char readValueChar = char(readValue);
-        if(readValueChar != '@')
-          retVal += readValueChar;
-    }
-
-    Serial.println(retVal);
-
-    return retVal;
+  for (int i = addr; i < 128; i++) {
+    byte readValue = EEPROM.read(i);
+    if (readValue == 0) break; // Nullterminator = Ende
+    char readValueChar = char(readValue);
+    if(readValueChar != '@')
+      retVal += readValueChar;
+  }
+  Serial.println(retVal);
+  return retVal;
 }
 
 void DisplaySelectionArrow()
@@ -825,7 +852,7 @@ void rotate(Rotary& r)
 
     char string[128];
     sprintf(string, "Speed: %i WPM", wpm);
-    display.print(string, 6,1);
+    display.print(string, 6,2);
   
     CalculateTimes(wpm);
     EEPROM.write(EEPROM_WPM_ADDR, wpm);
