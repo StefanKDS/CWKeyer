@@ -5,7 +5,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
 <head>
-  <title>CWKeyer v0.1</title>
+  <title>CWKeyer v0.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
@@ -94,23 +94,23 @@ const char index_html[] PROGMEM = R"rawliteral(
     <h1>CWKeyer v0.4</h1>
     <h2>Memory</h2>
     <form action="/get">
-      <label>Text 1:
-        <input type="text" name="input1" maxlength="128">
+      <label>Mem 1:
+        <input type="text" name="input1" maxlength="128" value="%TEXT1%">
       </label>
-      <input type="submit" value="Speichern">
+      <input type="submit" value="Save">
     </form>
     <form action="/get">
-      <label>Text 2:
-        <input type="text" name="input2" maxlength="128">
+      <label>Mem 2:
+        <input type="text" name="input2" maxlength="128" value="%TEXT2%">
       </label>
-      <input type="submit" value="Speichern">
+      <input type="submit" value="Save">
     </form>
     <h2>Trainer Letters</h2>
     <form action="/save_letters" method="get">
-  %LETTERS_CHECKBOXES%
-  <br>
-  <input type="submit" value="Speichern">
-</form>
+      %LETTERS_CHECKBOXES%
+      <br>
+      <input type="submit" value="Save">
+    </form>
   </div>
 </body>
 </html>

@@ -85,12 +85,68 @@ String generateLetterCheckboxes() {
   return html;
 }
 
+String wrapInPage(String content) {
+  String html = R"rawliteral(
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>CWKeyer v0.4</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f4f4;
+      color: #222;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 480px;
+      margin: 30px auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 24px 32px 32px 32px;
+      text-align: center;
+    }
+    h1 {
+      text-align: center;
+      color: #005fa3;
+      margin-bottom: 20px;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      color: #005fa3;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CWKeyer v0.4</h1>
+    %CONTENT%
+    <br>
+    <a href="/">Back</a>
+  </div>
+</body>
+</html>
+)rawliteral";
+
+  html.replace("%CONTENT%", content);
+  return html;
+}
+
 /////////////////////////////////////////////////////////////////
 // Setup
 /////////////////////////////////////////////////////////////////
 void setup() {
   Serial.begin(SERIAL_SPEED);
-  delay(1000);
+  //delay(1000);
 
    // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   Serial.println("- EEPROM INIT -");
@@ -101,7 +157,7 @@ void setup() {
   Serial.print("Read wpm: ");
   Serial.println(value, DEC);
 
-  if(value > 255 || value < 0)
+  if(value >= 100 || value < 0)
   {
     wpm = 14;
   }
@@ -133,11 +189,18 @@ void setup() {
   // Print ESP8266 Local IP Address
   Serial.println(WiFi.localIP());
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
   String page = index_html;
+  // EEPROM-Inhalte lesen
+  String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
+  String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
+
+  page.replace("%TEXT1%", text1);
+  page.replace("%TEXT2%", text2);
   page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
-  request->send_P(200, "text/html", page.c_str());
-  });
+
+  request->send(200, "text/html", page);
+});
 
   server.on("/save_letters", HTTP_GET, [](AsyncWebServerRequest *request){
   String selected = "";
@@ -152,7 +215,8 @@ void setup() {
     WriteTextToEEPROM(0x40, selected);
     selectedLetters = selected; // Auswahl aktualisieren
   }
-  request->send(200, "text/html", "Gespeichert: " + selected + "<br><a href=\"/\">Zurück</a>");
+  String content = "<p>Gespeichert: " + selected + "</p>";
+  request->send(200, "text/html", wrapInPage(content));
   });
 
   // Send web page with input fields to client
@@ -185,8 +249,8 @@ void setup() {
       inputParam = "none";
     }
     Serial.println(inputMessage);
-    request->send(200, "text/html", inputParam + " is saved." +
-                                     "<br><a href=\"/\">Back</a>");
+    String content = "<p>Gespeichert: " + inputParam + "</p>";
+    request->send(200, "text/html", wrapInPage(content));
   });
   server.onNotFound(notFound);
 
