@@ -26,6 +26,7 @@ void ShowKeyerScreen();
 void rotate(Rotary& r);
 void ReactOnButtonClick();
 void ProcessBeep(short beepoLength, char outputChar);
+void PlaySign(char sign);
 
 /////////////////////////////////////////////////////////////////
 // Objects
@@ -378,8 +379,9 @@ void loop() {
       {
          display.clear();
          display.print("Not Correct !",4,2);
+         PlaySign(currentTrainerLetter);
       }
-       delay(2000);
+       delay(1000);
        ShowTrainerGiveScreen();
     }
   }
@@ -605,6 +607,32 @@ void ProcessBeep(short beepoLength, char outputChar)
     delay(beepPause+beepoLength);
   }
   Serial.print(outputChar);
+}
+
+/////////////////////////////////////////////////////////////////
+/// PlaySign
+/////////////////////////////////////////////////////////////////
+void PlaySign(char sign)
+{
+  String encoded =  EncodeChar(sign);
+  if(encoded.length() > 0)
+    {
+      for (int i=0; i < encoded.length(); i++)
+      {
+        if(encoded[i] == '.')
+        {
+          ProcessBeep(beepShort, encoded[i]);
+        }
+        else if(encoded[i] == '-')
+        {
+          ProcessBeep(beepLong, encoded[i]);
+        }
+        else if(encoded[i] == ' ')
+        {
+           delay(beepPause*2);
+        }
+      }
+    }
 }
 
 /////////////////////////////////////////////////////////////////
