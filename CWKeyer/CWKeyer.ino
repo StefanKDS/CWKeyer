@@ -26,7 +26,7 @@ void ShowKeyerScreen();
 void rotate(Rotary& r);
 void ReactOnButtonClick();
 void ProcessBeep(short beepoLength, char outputChar);
-void PlaySign(char sign);
+void ProcessSign(char sign);
 
 /////////////////////////////////////////////////////////////////
 // Objects
@@ -42,6 +42,8 @@ AsyncWebServer server(80);
 short beepLong;
 short beepShort;
 short beepPause;
+short letterPause;
+short wordPause;
 char wpm = START_POS;
 bool speed_mode = false;
 bool speakerOn = true;
@@ -379,7 +381,7 @@ void loop() {
       {
          display.clear();
          display.print("Not Correct !",4,2);
-         PlaySign(currentTrainerLetter);
+         ProcessSign(currentTrainerLetter);
       }
        delay(1000);
        ShowTrainerGiveScreen();
@@ -610,9 +612,9 @@ void ProcessBeep(short beepoLength, char outputChar)
 }
 
 /////////////////////////////////////////////////////////////////
-/// PlaySign
+/// ProcessSign
 /////////////////////////////////////////////////////////////////
-void PlaySign(char sign)
+void ProcessSign(char sign)
 {
   String encoded =  EncodeChar(sign);
   if(encoded.length() > 0)
@@ -626,10 +628,6 @@ void PlaySign(char sign)
         else if(encoded[i] == '-')
         {
           ProcessBeep(beepLong, encoded[i]);
-        }
-        else if(encoded[i] == ' ')
-        {
-           delay(beepPause*2);
         }
       }
     }
@@ -649,25 +647,17 @@ void PlayMemory(byte addr)
     
   for (int i=0; i < text.length(); i++)
   {
-    String encoded =  EncodeChar(text[i]);
-
-    if(encoded.length() > 0)
+    if(text[i] != ' ')
     {
-      for (int i=0; i < encoded.length(); i++)
-      {
-        if(encoded[i] == '.')
-        {
-          ProcessBeep(beepShort, encoded[i]);
-        }
-        else if(encoded[i] == '-')
-        {
-          ProcessBeep(beepLong, encoded[i]);
-        }
-        else if(encoded[i] == ' ')
-        {
-           delay(beepPause*2);
-        }
-      }
+      // Ein Buchstabe oder eine Zahl
+      ProcessSign(text[i]);
+      // Pause zwischen den Buchstaben
+      delay(letterPause);
+    }
+    else
+    {
+      // Ein Leerzeichen
+      delay(wordPause);
     }
   }
 }
@@ -688,10 +678,6 @@ String EncodeChar(char sign)
     else if (sign >= '0' && sign <= '9') 
     {
       return MORSE_NUMBERS[sign - '0'];
-    }
-    else if (sign == ' ') 
-    {
-      return " ";
     }
 
     return "";
@@ -860,6 +846,8 @@ void CalculateTimes(char wpm)
     beepPause = w; 
     beepShort = w; 
     beepLong = 3 * w;
+    letterPause = 3 * w;
+    wordPause   = 7 * w;
 
     Serial.print("Pause:");
     Serial.println(beepPause);

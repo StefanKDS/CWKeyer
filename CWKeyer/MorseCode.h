@@ -1,7 +1,7 @@
 #ifndef MORSECODE_H
 #define MORSECODE_H
 
-char* MORSE_LETTERS[] = {
+const char* MORSE_LETTERS[] = {
   ".-",     // A
   "-...",   // B
   "-.-.",   // C
@@ -59,7 +59,7 @@ String LETTERS[] = {
   "Z"    // Z
 };
 
-char* MORSE_NUMBERS[] = {
+const char* MORSE_NUMBERS[] = {
   "-----",   // 0
   ".----",   // 1
   "..---",   // 2

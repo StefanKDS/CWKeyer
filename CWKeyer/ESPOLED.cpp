@@ -345,7 +345,7 @@ void OLED::clear(void) {
   clear_display();
 }
 
-void OLED::print(char *s, uint8_t r, uint8_t c) {
+void OLED::print(const char *s, uint8_t r, uint8_t c) {
   DEBUG_PRINT("print ");
   DEBUG_PRINT(r);
   DEBUG_PRINT(",");

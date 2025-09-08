@@ -29,7 +29,7 @@ class OLED {
     void on(void);
     void off(void);
     void clear(void);
-    void print(char *s, uint8_t r=0, uint8_t c=0);
+    void print(const char *s, uint8_t r=0, uint8_t c=0);
 
   private:
     uint8_t _sda, _scl, _address, _offset;
