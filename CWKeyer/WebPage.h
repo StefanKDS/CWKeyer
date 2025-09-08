@@ -1,6 +1,9 @@
 #ifndef WEBPAGE_H
 #define WEBPAGE_H
 
+//////////////////////////////////////////////////////
+// index_html[]
+//////////////////////////////////////////////////////
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
@@ -115,5 +118,65 @@ const char index_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
+
+//////////////////////////////////////////////////////
+// wrapInPage
+//////////////////////////////////////////////////////
+String wrapInPage(String content) {
+  String html = R"rawliteral(
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>CWKeyer v0.4</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f4f4;
+      color: #222;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 480px;
+      margin: 30px auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 24px 32px 32px 32px;
+      text-align: center;
+    }
+    h1 {
+      text-align: center;
+      color: #005fa3;
+      margin-bottom: 20px;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      color: #005fa3;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CWKeyer v0.4</h1>
+    %CONTENT%
+    <br>
+    <a href="/">Back</a>
+  </div>
+</body>
+</html>
+)rawliteral";
+
+  html.replace("%CONTENT%", content);
+  return html;
+}
 
 #endif

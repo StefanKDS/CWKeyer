@@ -74,6 +74,9 @@ void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
 
+/////////////////////////////////////////////////////////////////
+// generateLetterCheckboxes
+/////////////////////////////////////////////////////////////////
 String generateLetterCheckboxes() {
   String html = "";
   for (int i = 0; i < 26; i++) {
@@ -88,66 +91,11 @@ String generateLetterCheckboxes() {
   return html;
 }
 
-String wrapInPage(String content) {
-  String html = R"rawliteral(
-<!DOCTYPE HTML>
-<html>
-<head>
-  <title>CWKeyer v0.4</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: #f4f4f4;
-      color: #222;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 480px;
-      margin: 30px auto;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 24px 32px 32px 32px;
-      text-align: center;
-    }
-    h1 {
-      text-align: center;
-      color: #005fa3;
-      margin-bottom: 20px;
-    }
-    a {
-      display: inline-block;
-      margin-top: 20px;
-      color: #005fa3;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>CWKeyer v0.4</h1>
-    %CONTENT%
-    <br>
-    <a href="/">Back</a>
-  </div>
-</body>
-</html>
-)rawliteral";
-
-  html.replace("%CONTENT%", content);
-  return html;
-}
-
 /////////////////////////////////////////////////////////////////
 // Setup
 /////////////////////////////////////////////////////////////////
-void setup() {
+void setup() 
+{
   Serial.begin(SERIAL_SPEED);
   //delay(1000);
 
@@ -192,18 +140,18 @@ void setup() {
   // Print ESP8266 Local IP Address
   Serial.println(WiFi.localIP());
 
-server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-  String page = index_html;
-  // EEPROM-Inhalte lesen
-  String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
-  String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String page = index_html;
+    // EEPROM-Inhalte lesen
+    String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
+    String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
 
-  page.replace("%TEXT1%", text1);
-  page.replace("%TEXT2%", text2);
-  page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
+    page.replace("%TEXT1%", text1);
+    page.replace("%TEXT2%", text2);
+    page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
 
-  request->send(200, "text/html", page);
-});
+    request->send(200, "text/html", page);
+  });
 
   server.on("/save_letters", HTTP_GET, [](AsyncWebServerRequest *request){
   String selected = "";
@@ -228,11 +176,13 @@ server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
   });
 
   // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
-  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) 
+  {
     String inputMessage;
     String inputParam;
     // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-    if (request->hasParam(TEXT_1)) {
+    if (request->hasParam(TEXT_1)) 
+    {
       // Write TEXT_1 to EEPROM
       WriteTextToEEPROM(EEPROM_MEM1_ADDR, request->getParam(TEXT_1)->value());
       
@@ -240,15 +190,16 @@ server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
       inputParam = TEXT_1;
     }
     // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
-    else if (request->hasParam(TEXT_2)) {
+    else if (request->hasParam(TEXT_2)) 
+    {
       // Write TEXT_2 to EEPROM
       WriteTextToEEPROM(EEPROM_MEM2_ADDR, request->getParam(TEXT_2)->value());
       
       //inputMessage = request->getParam(TEXT_2)->value();
       inputParam = TEXT_2;
     }
-    else {
-      //inputMessage = "No message sent";
+    else 
+    {
       inputParam = "none";
     }
     Serial.println(inputMessage);
