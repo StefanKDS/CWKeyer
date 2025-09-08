@@ -4,7 +4,7 @@
 # eMail=
 #
 # Project=CWKeyer
-# Date=13:05:01
+# Date=16:57:03
 # CreatedBy=Fritzing 1.0.4.2024-10-07.CD-2088-0-a8c6ef7c
 #
 #
@@ -14,11 +14,11 @@
 #
 RefDes,Description,Package,X,Y,Rotation,Side,Mount
 Description: resistance;capacitance;inductance;voltage;current;power;mpn;mn;
-ESP8266,";;;;;;;;","",679.081,1164.88,0,Top,MANUAL
-Battery,";;;;;;;;","THT",1477.56,287.219,-90,Top,THT
-R1,";;;;;0.5W;;;","THT",1630.46,1885.64,0,Top,THT
-Encoder,";;;;;;;;","THT",2027.56,1487.22,0,Top,THT
-Display,";;;;;;;;","THT",2027.56,537.219,0,Top,THT
-Speaker,";;;;;;;;","THT",2027.56,1887.22,0,Top,THT
-Buzz,";;;;;;;;","",2027.56,1137.22,0,Top,MANUAL
-Keyer,";;;;;;;;","THT",2027.56,887.219,0,Top,THT
+Speaker,";;;;;;;;","THT",3017.03,1892.73,0,Top,THT
+Display,";;;;;;;;","THT",2067.03,292.726,90,Top,THT
+ESP8266,";;;;;;;;","",668.548,1170.39,0,Top,MANUAL
+Battery,";;;;;;;;","THT",1467.03,292.726,-90,Top,THT
+Buzz,";;;;;;;;","",3017.03,1142.73,0,Top,MANUAL
+Volume,";;;;;0.5W;;;","THT",2011.03,1892.73,0,Top,THT
+Keyer,";;;;;;;;","THT",3017.03,892.726,0,Top,THT
+Encoder,";;;;;;;;","THT",3017.03,1492.73,0,Top,THT
