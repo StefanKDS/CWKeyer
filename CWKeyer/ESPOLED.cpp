@@ -332,26 +332,17 @@ void OLED::begin(void) {
 }
 
 void OLED::on(void) {
-  DEBUG_PRINTLN("on");
   displayOn();
 }
 
 void OLED::off(void) {
-  DEBUG_PRINTLN("off");
   displayOff();
 }
 
 void OLED::clear(void) {
-  DEBUG_PRINTLN("clear");
   clear_display();
 }
 
 void OLED::print(const char *s, uint8_t r, uint8_t c) {
-  DEBUG_PRINT("print ");
-  DEBUG_PRINT(r);
-  DEBUG_PRINT(",");
-  DEBUG_PRINT(c);
-  DEBUG_PRINT(" ");
-  DEBUG_PRINTLN(s);
   sendStrXY(s, r, c);
 }

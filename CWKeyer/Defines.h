@@ -66,7 +66,7 @@
 #define MORSE_DOT '.'
 #define MORSE_DASH '-'
 
-#define DEBUG 0
+#define DEBUG 1
 
 #ifdef DEBUG
   #define DEBUG_BEGIN(...) { Serial.begin(__VA_ARGS__); }

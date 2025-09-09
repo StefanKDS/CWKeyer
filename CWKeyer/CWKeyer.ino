@@ -27,6 +27,13 @@ void ReactOnButtonClick();
 void ProcessBeep(short beepoLength, char outputChar);
 void ProcessSign(char sign);
 
+// Non-blocking helpers
+void startBeep(unsigned int length, char symbol);
+void updateBeep();
+bool canStartNext(); // optional helper
+void startPlayback(String text);
+void updatePlayback();
+
 /////////////////////////////////////////////////////////////////
 // Objects
 /////////////////////////////////////////////////////////////////
@@ -38,11 +45,39 @@ ESP8266WebServer server(80);
 // Variables
 /////////////////////////////////////////////////////////////////
 
+// Non-blocking Beep / Playback state
+bool beeping = false;
+unsigned long beepEnd = 0;
+
+bool inPause = false;
+unsigned long pauseEnd = 0;
+
+unsigned long lastKeyTime = 0; // Zeit der letzten Eingabe
+unsigned int letterGap = 3;    // 3T Pause = Buchstabenende
+
+
+bool playing = false;
+String playbackText = "";
+int playbackIndex = 0;
+String currentMorse = "";
+int morseIndex = 0;
+unsigned long nextActionTime = 0;
+
+// Timing (T-basierte)
+unsigned int T_unit = 0;
+unsigned int dit_len = 0;
+unsigned int dah_len = 0;
+unsigned int elementGap = 0; // entspricht inter-element gap (1T)
+unsigned int letterExtra = 0;
+unsigned int wordExtra = 0;
+
+// Legacy timing vars (für Kompatibilität mit Rest des Codes)
 short beepLong;
 short beepShort;
 short beepPause;
 short letterPause;
 short wordPause;
+
 char wpm = START_POS;
 bool speed_mode = false;
 bool speakerOn = true;
@@ -149,9 +184,8 @@ String generateLetterCheckboxes() {
 void setup() 
 {
   DEBUG_BEGIN(SERIAL_SPEED);
-  //delay(1000);
 
-   // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   DEBUG_PRINTLN("- EEPROM INIT -");
   EEPROM.begin(EEPROM_SIZE);
   
@@ -162,7 +196,7 @@ void setup()
 
   if(value >= 100 || value < 0)
   {
-    wpm = 14;
+    wpm = START_POS;
   }
   else
   {
@@ -233,6 +267,109 @@ void setup()
 }
 
 /////////////////////////////////////////////////////////////////
+// startBeep / updateBeep / canStartNext
+/////////////////////////////////////////////////////////////////
+void startBeep(unsigned int length, char symbol)
+{
+  // start continuous tone (we'll stop manually in updateBeep)
+  noTone(SPEAKER_PIN);
+  tone(SPEAKER_PIN, 1000);
+  if (speakerOn) digitalWrite(BUZZER_PIN, HIGH);
+
+  beeping = true;
+  beepEnd = millis() + length;
+  DEBUG_PRINT(symbol);
+}
+
+bool canStartNext()
+{
+  // true wenn kein Ton läuft und keine Pause aktiv ist
+  return !beeping && !inPause;
+}
+
+void updateBeep()
+{
+ unsigned long now = millis();
+
+    if(beeping && now >= beepEnd)
+    {
+      noTone(SPEAKER_PIN);
+      digitalWrite(BUZZER_PIN, LOW);
+      beeping = false;
+
+      // Starte Pause nach Ton
+      inPause = true;
+      pauseEnd = now + beepPause;
+    }
+
+    if(inPause && now >= pauseEnd)
+    {
+      inPause = false; // nächste Eingabe möglich
+      lastKeyTime = now; // WICHTIG: update lastKeyTime hier
+    }
+}
+
+/////////////////////////////////////////////////////////////////
+// Non-blocking Playback
+/////////////////////////////////////////////////////////////////
+void startPlayback(String text)
+{
+  playbackText = text;
+  playbackIndex = 0;
+  currentMorse = "";
+  morseIndex = 0;
+  playing = true;
+  nextActionTime = millis(); // sofort loslegen
+}
+
+void updatePlayback()
+{
+  if (!playing) return;
+
+  unsigned long now = millis();
+  if (now < nextActionTime) return;
+
+  // Wenn wir gerade kein Morse für das aktuelle Zeichen haben -> nächstes Zeichen holen
+  if (currentMorse.length() == 0)
+  {
+    if (playbackIndex >= playbackText.length())
+    {
+      playing = false;
+      return;
+    }
+
+    char c = playbackText[playbackIndex++];
+    if (c == ' ')
+    {
+      // Wortpause: bereits elementGap (1T) vor dem Aufruf berücksichtigt -> zusätzlich wordExtra
+      nextActionTime = now + wordExtra;
+      return;
+    }
+    else
+    {
+      currentMorse = EncodeChar(c);
+      morseIndex = 0;
+    }
+  }
+
+  // Nächstes Symbol dieser Buchstabe
+  if (morseIndex < currentMorse.length())
+  {
+    char sym = currentMorse[morseIndex++];
+    unsigned int len = (sym == '.') ? dit_len : dah_len;
+    startBeep(len, sym);
+    // nach Beep wollen wir (len + elementGap) warten (Beep + 1T)
+    nextActionTime = now + len + elementGap;
+  }
+  else
+  {
+    // Ganze Buchstabe fertig: zusätzlich letterExtra warten (wir hatten schon elementGap)
+    currentMorse = "";
+    nextActionTime = now + letterExtra;
+  }
+}
+
+/////////////////////////////////////////////////////////////////
 // CalcDisplayPosition
 /////////////////////////////////////////////////////////////////
 void CalcDisplayPosition( short chars_on_display, int* r, int* c )
@@ -244,93 +381,85 @@ void CalcDisplayPosition( short chars_on_display, int* r, int* c )
 /////////////////////////////////////////////////////////////////
 // Loop
 /////////////////////////////////////////////////////////////////
-void loop() {
-  server.handleClient();
+void loop() 
+{
+    server.handleClient();
+    r.loop();
 
-  // Encoder +++++++++++++++++++++++++++++++++++++
-  r.loop();
-  // +++++++++++++++++++++++++++++++++++++++++++++
-
-  // Encoder Button
-  if( digitalRead(MODE_BUTTON_PIN) == LOW )
-  {
-    StateMachine(MODE_BUTTON_PIN);
-    delay(250);
-  }
-  
-  // Keyer +++++++++++++++++++++++++++++++++++++++
-  if( digitalRead(KEYER_SHORT_PIN) == LOW )
-  {
-    StateMachine(KEYER_SHORT_PIN);
-  }
-  else
-  {
-     digitalWrite(BUZZER_PIN,0);
-  }
-
-  if( digitalRead(KEYER_LONG_PIN) == LOW )
-  {
-     StateMachine(KEYER_LONG_PIN);
-  }
-  else
-  {
-    digitalWrite(BUZZER_PIN,0);
-  }
-
-  if(actual_menu == MONITOR)
-  {
-    if((millis() - key_activated) > (beepPause*2) && decoderString != "")
+    // Encoder Button
+    if(digitalRead(MODE_BUTTON_PIN) == LOW)
     {
-      char buffer[5];  // Annahme: Platz für die Zeichenfolge
-      String morseString = DecodeMorseCode(decoderString);
-      morseString.toCharArray(buffer, sizeof(buffer));
-      // 6 x 15 Zeichen sind möglich = 90
-      
-      if(char_on_screen == 90)
-      {
-        char_on_screen = 0;
-        display.clear();
-      }
-      else
-      {
-        char_on_screen++;
-      }
-
-      int r,c;
-      CalcDisplayPosition(char_on_screen, &r, &c);
-
-      display.print(buffer, r,c);
-      decoderString = "";
+        StateMachine(MODE_BUTTON_PIN);
+        delay(250);
     }
-  }
 
-  if(actual_menu == TRAINER_GIVE_SCREEN)
-  {
-    if((millis() - key_activated) > (beepPause*2) && decoderString != "")
+    // Keyer
+    bool shortPressed = digitalRead(KEYER_SHORT_PIN) == LOW;
+    bool longPressed  = digitalRead(KEYER_LONG_PIN) == LOW;
+
+    if(shortPressed && !beeping && !inPause) 
     {
-      char buffer[5];  // Annahme: Platz für die Zeichenfolge
-      String morseString = DecodeMorseCode(decoderString);
-      morseString.toCharArray(buffer, sizeof(buffer));
-      // 6 x 15 Zeichen sind möglich = 90
-      
-      if(buffer[0] == currentTrainerLetter)
-      {
-         display.clear();
-         display.print("Correct !",4,4);
-      }
-      else
-      {
-         display.clear();
-         display.print("Not Correct !",4,2);
-         ProcessSign(currentTrainerLetter);
-      }
-       delay(1000);
-       ShowTrainerGiveScreen();
+        StateMachine(KEYER_SHORT_PIN);
+        lastKeyTime = millis(); // letzte Eingabe merken
     }
-  }
 
-  StateMachine(NO_KEY);
-  // +++++++++++++++++++++++++++++++++++++++++++++
+    if(longPressed && !beeping && !inPause) 
+    {
+        StateMachine(KEYER_LONG_PIN);
+        lastKeyTime = millis(); // letzte Eingabe merken
+    }
+
+    updateBeep();
+    updatePlayback();
+
+    // MONITOR oder TRAINER
+    if(actual_menu == MONITOR || actual_menu == TRAINER_GIVE_SCREEN)
+    {
+        unsigned long now = millis();
+
+    // Prüfen, ob ein Buchstabe fertig ist: kein Beep mehr und
+    // seit letztem Element mindestens letterExtra Zeit vergangen
+    if(decoderString.length() > 0 && !beeping && !inPause && (now - lastKeyTime) >= letterExtra)
+    {
+        String decodedLetter = DecodeMorseCode(decoderString);
+
+        char buf[2] = { decodedLetter[0], '\0' }; // char-Array für Display
+
+        if(actual_menu == MONITOR)
+        {
+            if(char_on_screen >= 90)
+            {
+                char_on_screen = 0;
+                display.clear();
+            }
+            else char_on_screen++;
+
+            int r, c;
+            CalcDisplayPosition(char_on_screen, &r, &c);
+            display.print(buf, r, c);
+        }
+        else if(actual_menu == TRAINER_GIVE_SCREEN)
+        {
+            if(buf[0] == currentTrainerLetter)
+            {
+                display.clear();
+                display.print("Correct !", 4,4);
+            }
+            else
+            {
+                display.clear();
+                display.print("Not Correct !",4,2);
+                ProcessSign(currentTrainerLetter);
+            }
+            delay(1000);
+            ShowTrainerGiveScreen();
+        }
+
+        decoderString = ""; // Buffer leeren für das nächste Zeichen
+      }
+    }
+
+    StateMachine(NO_KEY);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -340,35 +469,42 @@ void StateMachine(int key)
 {
   if(State == STATE_IDLE)
   {
+    // SHORT KEY
     if(key == KEYER_SHORT_PIN)
     {
-      ProcessBeep(beepShort, '.');
-      decoderString += ".";
-      key_activated = millis();
+      // Nur starten, wenn aktuell kein Beep oder Pause läuft
+      if(!beeping && !inPause)
+      {
+        ProcessBeep(beepShort, '.');
+        decoderString += ".";
+        key_activated = millis();
+      }
     }
 
+    // LONG KEY
     if(key == KEYER_LONG_PIN)
     {
-       ProcessBeep(beepLong, '-');
-       decoderString += "-";
-       key_activated = millis();
+      if(!beeping && !inPause)
+      {
+        ProcessBeep(beepLong, '-');
+        decoderString += "-";
+        key_activated = millis();
+      }
     }
 
+    // MODE BUTTON
     if(key == MODE_BUTTON_PIN)
     {
-       ReactOnButtonClick();
+      ReactOnButtonClick();
     }
   }
   else if(State == STATE_MEM)
   {
-    if(key == NO_KEY)
-    {
-      
-    }
+    // MEM-Mode Aktionen
   }
   else if(State == STATE_TRAINER)
   {
-    
+    // Trainer-Mode Aktionen
   }
 }
 
@@ -533,23 +669,20 @@ void SwitchSpeaker(byte value)
 }
 
 /////////////////////////////////////////////////////////////////
-/// ProcessBeep
+/// ProcessBeep  (non-blocking)
 /////////////////////////////////////////////////////////////////
 void ProcessBeep(short beepoLength, char outputChar)
 {
-  tone(SPEAKER_PIN, 1000, beepoLength); 
-  if(speakerOn == true)
-  {
-    digitalWrite(BUZZER_PIN,1);
-    delay(beepoLength);
-    digitalWrite(BUZZER_PIN,0);
-    delay(beepPause);
-  }
-  else
-  {
-    delay(beepPause+beepoLength);
-  }
-  DEBUG_PRINT(outputChar);
+    tone(SPEAKER_PIN, 1000); 
+    // Ton starten
+    if(speakerOn) {
+        digitalWrite(BUZZER_PIN, HIGH);
+    }
+
+    beeping = true;
+    beepEnd = millis() + beepoLength;  // wann der Ton endet
+    // Pause nach Beep wird in updateBeep() automatisch gestartet
+    DEBUG_PRINT(outputChar);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -557,21 +690,8 @@ void ProcessBeep(short beepoLength, char outputChar)
 /////////////////////////////////////////////////////////////////
 void ProcessSign(char sign)
 {
-  String encoded =  EncodeChar(sign);
-  if(encoded.length() > 0)
-    {
-      for (int i=0; i < encoded.length(); i++)
-      {
-        if(encoded[i] == '.')
-        {
-          ProcessBeep(beepShort, encoded[i]);
-        }
-        else if(encoded[i] == '-')
-        {
-          ProcessBeep(beepLong, encoded[i]);
-        }
-      }
-    }
+  // play single character non-blocking
+  startPlayback(String(sign));
 }
 
 /////////////////////////////////////////////////////////////////
@@ -585,22 +705,8 @@ void PlayMemory(byte addr)
 
   if(text.length() <= 0)
     return;
-    
-  for (int i=0; i < text.length(); i++)
-  {
-    if(text[i] != ' ')
-    {
-      // Ein Buchstabe oder eine Zahl
-      ProcessSign(text[i]);
-      // Pause zwischen den Buchstaben
-      delay(letterPause);
-    }
-    else
-    {
-      // Ein Leerzeichen
-      delay(wordPause);
-    }
-  }
+
+  startPlayback(text);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -651,7 +757,7 @@ String DecodeMorseCode(String code) {
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowMainScreen
+// ShowMainScreen
 /////////////////////////////////////////////////////////////////
 void ShowMainScreen()
 {
@@ -669,7 +775,7 @@ void ShowMainScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowKeyerScreen
+// ShowKeyerScreen
 /////////////////////////////////////////////////////////////////
 void ShowKeyerScreen()
 {
@@ -692,7 +798,7 @@ void ShowKeyerScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowTrainerScreen
+// ShowTrainerScreen
 /////////////////////////////////////////////////////////////////
 void ShowTrainerScreen()
 {
@@ -710,7 +816,7 @@ void ShowTrainerScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowTrainerHearScreen
+// ShowTrainerHearScreen
 /////////////////////////////////////////////////////////////////
 void ShowTrainerHearScreen()
 {
@@ -718,7 +824,7 @@ void ShowTrainerHearScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowTrainerGiveScreen
+// ShowTrainerGiveScreen
 /////////////////////////////////////////////////////////////////
 void ShowTrainerGiveScreen()
 {
@@ -727,6 +833,10 @@ void ShowTrainerGiveScreen()
   display.clear();
 
   // Zufälligen Buchstaben aus aktiver Liste wählen
+  if (selectedLetters.length() == 0) {
+    // Fallback: alle Buchstaben
+    selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  }
   int idx = random(0, selectedLetters.length());
   char letter = selectedLetters[idx];
   currentTrainerLetter = letter;
@@ -734,7 +844,9 @@ void ShowTrainerGiveScreen()
   char buf[2] = { currentTrainerLetter, '\0' };
   display.print(buf, 4, 7);
 
+  DEBUG_PRINT("SelectedLetters: ");
   DEBUG_PRINTLN(selectedLetters);
+  DEBUG_PRINT("CurrentTrainerLetter: ");
   DEBUG_PRINTLN(currentTrainerLetter);
 
   decoderString = "";
@@ -742,7 +854,7 @@ void ShowTrainerGiveScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowSetupScreen
+// ShowSetupScreen
 /////////////////////////////////////////////////////////////////
 void ShowSetupScreen()
 {
@@ -750,7 +862,6 @@ void ShowSetupScreen()
   selected_menu_item = 1;
   
   display.clear();
-  display.print("Setup", 0,1);
     
   if(speakerOn == true)
     display.print("Speaker ON  ", 2,4);
@@ -765,7 +876,7 @@ void ShowSetupScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-/// ShowSetupScreen
+// ShowMonitorScreen
 /////////////////////////////////////////////////////////////////
 void ShowMonitorScreen()
 {
@@ -773,31 +884,41 @@ void ShowMonitorScreen()
   selected_menu_item = 1;
   char_on_screen = 0;
   display.clear();
-
-  // 
-
 }
 
 /////////////////////////////////////////////////////////////////
-/// CalculateTimes
+// CalculateTimes
 /////////////////////////////////////////////////////////////////
 void CalculateTimes(char wpm)
 {
-    short w = 1200 / wpm;
-    beepPause = w; 
-    beepShort = w; 
-    beepLong = 3 * w;
-    letterPause = 3 * w;
-    wordPause   = 7 * w;
+  if (wpm <= 0) wpm = 1;
+  unsigned int T = 1200 / wpm; // Grundeinheit in ms
 
-    DEBUG_PRINT("Pause:");
-    DEBUG_PRINTLN(beepPause);
+  T_unit    = T;
+  dit_len   = T;        // 1T
+  dah_len   = 3 * T;    // 3T
+  elementGap = T;       // Pause zwischen Elementen (1T)
 
-    DEBUG_PRINT("Short:");
-    DEBUG_PRINTLN(beepShort);
+  // Wenn wir nach jedem Element schon 1T einplanen,
+  // brauchen wir für Buchstaben noch zusätzlich 2T (3T total):
+  letterExtra = 3 * T - elementGap; // = 2T
 
-    DEBUG_PRINT("Long:");
-    DEBUG_PRINTLN(beepLong);
+  // Für Wortpause: insgesamt 7T => zusätzlich 6T (neben dem 1T)
+  wordExtra = 7 * T - elementGap;   // = 6T
+
+  // Pflege legacy-Variablen (falls andere Teile des Codes diese verwenden)
+  beepShort = dit_len;
+  beepLong  = dah_len;
+  beepPause = elementGap;
+  letterPause = 3 * T; // legacy full letter pause
+  wordPause = 7 * T;   // legacy full word pause
+
+  DEBUG_PRINT("T: "); DEBUG_PRINTLN(T);
+  DEBUG_PRINT("dit: "); DEBUG_PRINTLN(dit_len);
+  DEBUG_PRINT("dah: "); DEBUG_PRINTLN(dah_len);
+  DEBUG_PRINT("elementGap: "); DEBUG_PRINTLN(elementGap);
+  DEBUG_PRINT("letterExtra: "); DEBUG_PRINTLN(letterExtra);
+  DEBUG_PRINT("wordExtra: "); DEBUG_PRINTLN(wordExtra);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -852,7 +973,7 @@ void DisplaySelectionArrow()
 }
 
 /////////////////////////////////////////////////////////////////
-/// Rotary 'onChange'
+// Rotary 'onChange'
 /////////////////////////////////////////////////////////////////
 void rotate(Rotary& r) 
 {
