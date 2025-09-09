@@ -105,7 +105,7 @@ void handleSaveLetters() {
   WriteTextToEEPROM(0x40, selected);
   selectedLetters = selected;
 
-  String content = "<p>Gespeichert: " + selected + "</p>";
+  String content = "<p>Saved: " + selected + "</p>";
   server.send(200, "text/html", wrapInPage(content));
 }
 
@@ -121,7 +121,7 @@ void handleGet() {
     WriteTextToEEPROM(EEPROM_MEM2_ADDR, server.arg(TEXT_2));
     inputParam = TEXT_2;
   }
-  String content = "<p>Gespeichert: " + inputParam + "</p>";
+  String content = "<p>Saved: " + inputParam + "</p>";
   server.send(200, "text/html", wrapInPage(content));
 }
 
@@ -728,7 +728,7 @@ void ShowTrainerGiveScreen()
 
   // Zufälligen Buchstaben aus aktiver Liste wählen
   int idx = random(0, selectedLetters.length());
-  char letter = pgm_read_byte(&LETTERS[idx]);
+  char letter = selectedLetters[idx];
   currentTrainerLetter = letter;
 
   char buf[2] = { currentTrainerLetter, '\0' };
