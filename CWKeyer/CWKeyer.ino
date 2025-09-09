@@ -1,6 +1,5 @@
-#include <ESP8266WiFi.h>
-#include <ESPAsyncTCP.h>
-#include <ESPAsyncWebServer.h>
+#include <ESP8266WiFi.h>   // oder <WiFi.h> für ESP32
+#include <ESP8266WebServer.h>
 #include "WebPage.h"
 
 #include <Wire.h>
@@ -33,7 +32,7 @@ void ProcessSign(char sign);
 /////////////////////////////////////////////////////////////////
 Rotary r;
 OLED display(4, 5,0x3c,0);
-AsyncWebServer server(80);
+ESP8266WebServer server(80);
 
 /////////////////////////////////////////////////////////////////
 // Variables
@@ -68,10 +67,62 @@ char currentTrainerLetter;
 int State = STATE_IDLE;
 
 /////////////////////////////////////////////////////////////////
-// HTML Page
+// notFound
 /////////////////////////////////////////////////////////////////
-void notFound(AsyncWebServerRequest *request) {
-  request->send(404, "text/plain", "Not found");
+void notFound() {
+  server.send(404, "text/html", wrapInPage("<p>Seite nicht gefunden</p>"));
+}
+
+/////////////////////////////////////////////////////////////////
+// handleRoot
+/////////////////////////////////////////////////////////////////
+void handleRoot() {
+  String page = index_html;
+  String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
+  String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
+
+  page.replace("%TEXT1%", text1);
+  page.replace("%TEXT2%", text2);
+  page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
+
+  // Cache-Header hinzufügen, damit Android nicht alte Versionen anzeigt
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+  server.send(200, "text/html", page);
+}
+
+/////////////////////////////////////////////////////////////////
+// handleSaveLetters
+/////////////////////////////////////////////////////////////////
+void handleSaveLetters() {
+  String selected = "";
+  int args = server.args();
+  for (int i = 0; i < args; i++) {
+    if (server.argName(i) == "letters") {
+      selected += server.arg(i);
+    }
+  }
+  WriteTextToEEPROM(0x40, selected);
+  selectedLetters = selected;
+
+  String content = "<p>Gespeichert: " + selected + "</p>";
+  server.send(200, "text/html", wrapInPage(content));
+}
+
+/////////////////////////////////////////////////////////////////
+// handleGet
+/////////////////////////////////////////////////////////////////
+void handleGet() {
+  String inputParam = "none";
+  if (server.hasArg(TEXT_1)) {
+    WriteTextToEEPROM(EEPROM_MEM1_ADDR, server.arg(TEXT_1));
+    inputParam = TEXT_1;
+  } else if (server.hasArg(TEXT_2)) {
+    WriteTextToEEPROM(EEPROM_MEM2_ADDR, server.arg(TEXT_2));
+    inputParam = TEXT_2;
+  }
+  String content = "<p>Gespeichert: " + inputParam + "</p>";
+  server.send(200, "text/html", wrapInPage(content));
 }
 
 /////////////////////////////////////////////////////////////////
@@ -140,74 +191,10 @@ void setup()
   // Print ESP8266 Local IP Address
   Serial.println(WiFi.localIP());
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    String page = index_html;
-    // EEPROM-Inhalte lesen
-    String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
-    String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
-
-    page.replace("%TEXT1%", text1);
-    page.replace("%TEXT2%", text2);
-    page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
-
-    request->send(200, "text/html", page);
-  });
-
-  server.on("/save_letters", HTTP_GET, [](AsyncWebServerRequest *request){
-  String selected = "";
-  if (request->hasParam("letters")) {
-    int params = request->params();
-    for (int i = 0; i < params; i++) {
-      const AsyncWebParameter* p = request->getParam(i);
-      if (p->name() == "letters") {
-        selected += p->value();
-      }
-    }
-    WriteTextToEEPROM(0x40, selected);
-    selectedLetters = selected; // Auswahl aktualisieren
-  }
-  String content = "<p>Gespeichert: " + selected + "</p>";
-  request->send(200, "text/html", wrapInPage(content));
-  });
-
-  // Send web page with input fields to client
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);
-  });
-
-  // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
-  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) 
-  {
-    String inputMessage;
-    String inputParam;
-    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-    if (request->hasParam(TEXT_1)) 
-    {
-      // Write TEXT_1 to EEPROM
-      WriteTextToEEPROM(EEPROM_MEM1_ADDR, request->getParam(TEXT_1)->value());
-      
-      //inputMessage = request->getParam(TEXT_1)->value();
-      inputParam = TEXT_1;
-    }
-    // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
-    else if (request->hasParam(TEXT_2)) 
-    {
-      // Write TEXT_2 to EEPROM
-      WriteTextToEEPROM(EEPROM_MEM2_ADDR, request->getParam(TEXT_2)->value());
-      
-      //inputMessage = request->getParam(TEXT_2)->value();
-      inputParam = TEXT_2;
-    }
-    else 
-    {
-      inputParam = "none";
-    }
-    Serial.println(inputMessage);
-    String content = "<p>Gespeichert: " + inputParam + "</p>";
-    request->send(200, "text/html", wrapInPage(content));
-  });
+  server.on("/", handleRoot);
+  server.on("/save_letters", handleSaveLetters);
+  server.on("/get", handleGet);
   server.onNotFound(notFound);
-
   server.begin();
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -257,6 +244,8 @@ void CalcDisplayPosition( short chars_on_display, int* r, int* c )
 // Loop
 /////////////////////////////////////////////////////////////////
 void loop() {
+  server.handleClient();
+
   // Encoder +++++++++++++++++++++++++++++++++++++
   r.loop();
   // +++++++++++++++++++++++++++++++++++++++++++++
