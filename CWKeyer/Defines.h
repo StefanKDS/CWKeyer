@@ -1,13 +1,13 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
-#define ROTARY_PIN1 0
-#define ROTARY_PIN2 2
-#define BUZZER_PIN 15
-#define KEYER_SHORT_PIN 12
-#define KEYER_LONG_PIN 13
-#define MODE_BUTTON_PIN 16
-#define SPEAKER_PIN 14
+#define ROTARY_PIN1 0 //D3
+#define ROTARY_PIN2 2 //D4
+#define BUZZER_PIN 15 //D8
+#define KEYER_SHORT_PIN 12 //D6
+#define KEYER_LONG_PIN 13 //D7
+#define MODE_BUTTON_PIN 16 //D0
+#define SPEAKER_PIN 14 //D5
 #define NO_KEY 999
 
 #define CLICKS_PER_STEP   4 
