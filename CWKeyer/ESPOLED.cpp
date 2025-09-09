@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include "ESPOLED.h"
+#include "Defines.h"
 
 //==========================================================//
 

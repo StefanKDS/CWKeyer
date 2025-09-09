@@ -1,4 +1,4 @@
-#include <ESP8266WiFi.h>   // oder <WiFi.h> für ESP32
+#include <ESP8266WiFi.h> 
 #include <ESP8266WebServer.h>
 #include "WebPage.h"
 
@@ -131,7 +131,8 @@ void handleGet() {
 String generateLetterCheckboxes() {
   String html = "";
   for (int i = 0; i < 26; i++) {
-    String letter = LETTERS[i];
+    char letterChar = pgm_read_byte(&LETTERS[i]); // korrekt aus PROGMEM lesen
+    String letter = String(letterChar);          // in String umwandeln
     bool checked = selectedLetters.indexOf(letter) != -1;
     html += "<input type='checkbox' name='letters' value='" + letter + "' id='l" + String(i) + "'";
     if (checked) html += " checked";
@@ -147,17 +148,17 @@ String generateLetterCheckboxes() {
 /////////////////////////////////////////////////////////////////
 void setup() 
 {
-  Serial.begin(SERIAL_SPEED);
+  DEBUG_BEGIN(SERIAL_SPEED);
   //delay(1000);
 
    // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- EEPROM INIT -");
+  DEBUG_PRINTLN("- EEPROM INIT -");
   EEPROM.begin(EEPROM_SIZE);
   
   byte value;
   value = EEPROM.read(EEPROM_WPM_ADDR);
-  Serial.print("Read wpm: ");
-  Serial.println(value, DEC);
+  DEBUG_PRINT("Read wpm: ");
+  DEBUG_PRINTLN(value, DEC);
 
   if(value >= 100 || value < 0)
   {
@@ -173,8 +174,8 @@ void setup()
   ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
 
   value = EEPROM.read(EEPROM_SPEAKER_ADDR);
-  Serial.print("Read Speaker setup: ");
-  Serial.println(value, DEC);
+  DEBUG_PRINT("Read Speaker setup: ");
+  DEBUG_PRINTLN(value, DEC);
 
   SwitchSpeaker((byte)value);
 
@@ -189,7 +190,7 @@ void setup()
   WiFi.softAPConfig(Ip, Ip, NMask);
 
   // Print ESP8266 Local IP Address
-  Serial.println(WiFi.localIP());
+  DEBUG_PRINTLN(WiFi.localIP());
 
   server.on("/", handleRoot);
   server.on("/save_letters", handleSaveLetters);
@@ -199,7 +200,7 @@ void setup()
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // OLED Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- BUZZER INIT -");
+  DEBUG_PRINTLN("- BUZZER INIT -");
   // Initialize display
   display.begin();
 
@@ -212,19 +213,19 @@ void setup()
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Beep Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- BUZZER INIT -");
+  DEBUG_PRINTLN("- BUZZER INIT -");
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN,0);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Keyer +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- KEYER INIT -");
+  DEBUG_PRINTLN("- KEYER INIT -");
   pinMode(KEYER_SHORT_PIN, INPUT_PULLUP);
   pinMode(KEYER_LONG_PIN, INPUT_PULLUP);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // MODE BTN ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  Serial.println("- BUTTON INIT -");
+  DEBUG_PRINTLN("- BUTTON INIT -");
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -379,32 +380,32 @@ void ReactOnButtonClick()
   // MAIN_MENU
   if(actual_menu == MAIN_MENU)
   {
-    Serial.println("MAIN_MENU");
+    DEBUG_PRINTLN("MAIN_MENU");
     
     if(selected_menu_item == CW_KEYER)
     {
-      Serial.println("ShowKeyerScreen");
+      DEBUG_PRINTLN("ShowKeyerScreen");
       ShowKeyerScreen();
       return;
     }
 
     if(selected_menu_item == SETUP)
     {
-      Serial.println("ShowSetupScreen");
+      DEBUG_PRINTLN("ShowSetupScreen");
       ShowSetupScreen();
       return;
     }
 
     if(selected_menu_item == MONITOR)
     {
-      Serial.println("ShowMonitorScreen");
+      DEBUG_PRINTLN("ShowMonitorScreen");
       ShowMonitorScreen();
       return;
     }
 
     if(selected_menu_item == TRAINER)
     {
-      Serial.println("ShowTimerScreen");
+      DEBUG_PRINTLN("ShowTimerScreen");
       ShowTrainerScreen();
       return;
     }
@@ -413,7 +414,7 @@ void ReactOnButtonClick()
   // CW_KEYER
   if(actual_menu == CW_KEYER)
   {
-     Serial.println("KEYER");
+     DEBUG_PRINTLN("KEYER");
      
     if(selected_menu_item == SPEED && speed_mode == false)
     {
@@ -427,21 +428,21 @@ void ReactOnButtonClick()
     if(selected_menu_item == MEM_1)
     {
       PlayMemory(EEPROM_MEM1_ADDR);
-      Serial.println("Play Mem 1");
+      DEBUG_PRINTLN("Play Mem 1");
       return;
     }
 
      if(selected_menu_item == MEM_2)
      {
       PlayMemory(EEPROM_MEM2_ADDR);
-      Serial.println("Play Mem 2");
+      DEBUG_PRINTLN("Play Mem 2");
       return;
     }
 
     if(selected_menu_item == CW_KEYER_BACK)
     {
       ShowMainScreen();
-      Serial.println("Keyer Back");
+      DEBUG_PRINTLN("Keyer Back");
       return;
     }
   }
@@ -449,25 +450,25 @@ void ReactOnButtonClick()
   // TRAINER
   if(actual_menu == TRAINER)
   {
-     Serial.println("TRAINER");
+     DEBUG_PRINTLN("TRAINER");
      
     if (selected_menu_item == TRAINER_HEAR)
     {
-      Serial.println("Trainer Hear");
+      DEBUG_PRINTLN("Trainer Hear");
       ShowTrainerHearScreen();
       return;
     }
 
     if (selected_menu_item == TRAINER_GIVE)
     {
-      Serial.println("Trainer Give");
+      DEBUG_PRINTLN("Trainer Give");
       ShowTrainerGiveScreen();
       return;
     }
 
     if(selected_menu_item == TRAINER_BACK)
     {
-      Serial.println("Trainer Back");
+      DEBUG_PRINTLN("Trainer Back");
       ShowMainScreen();
       return;
     }
@@ -488,7 +489,7 @@ void ReactOnButtonClick()
   // SETUP
   if(actual_menu == SETUP)
   {
-     Serial.println("SETUP");
+     DEBUG_PRINTLN("SETUP");
      
     if(selected_menu_item == SETUP_SPEAKER)
     {
@@ -496,13 +497,13 @@ void ReactOnButtonClick()
       {
         SwitchSpeaker(false);
         display.print("Speaker OFF", 2,4);
-        Serial.println("Speaker OFF");
+        DEBUG_PRINTLN("Speaker OFF");
       }
       else
       {
         SwitchSpeaker(true);
         display.print("Speaker ON ", 2,4);
-        Serial.println("Speaker ON ");
+        DEBUG_PRINTLN("Speaker ON ");
       }
 
       return;
@@ -510,7 +511,7 @@ void ReactOnButtonClick()
 
     if(selected_menu_item == SETUP_BACK)
     {
-      Serial.println("Setup Back");
+      DEBUG_PRINTLN("Setup Back");
       ShowMainScreen();
       return;
     }
@@ -548,7 +549,7 @@ void ProcessBeep(short beepoLength, char outputChar)
   {
     delay(beepPause+beepoLength);
   }
-  Serial.print(outputChar);
+  DEBUG_PRINT(outputChar);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -580,7 +581,7 @@ void PlayMemory(byte addr)
 {
   String text = ReadTextFromEEPROM(addr);
 
-  Serial.println(text);
+  DEBUG_PRINTLN(text);
 
   if(text.length() <= 0)
     return;
@@ -607,45 +608,45 @@ void PlayMemory(byte addr)
 /////////////////////////////////////////////////////////////////
 String EncodeChar(char sign)
 {
-    if (sign >= 'a' && sign <= 'z') 
-    {
-      return MORSE_LETTERS[sign - 'a'];
-    }
-    else if (sign >= 'A' && sign <= 'Z') 
-    {
-      return MORSE_LETTERS[sign - 'A'];
-    }
-    else if (sign >= '0' && sign <= '9') 
-    {
-      return MORSE_NUMBERS[sign - '0'];
-    }
+  char buffer[6]; // max Morse-Zeichen + null-Terminator
 
-    return "";
+  if (sign >= 'a' && sign <= 'z') {
+    strcpy_P(buffer, MORSE_LETTERS[sign - 'a']);
+    return String(buffer);
+  } 
+  else if (sign >= 'A' && sign <= 'Z') {
+    strcpy_P(buffer, MORSE_LETTERS[sign - 'A']);
+    return String(buffer);
+  } 
+  else if (sign >= '0' && sign <= '9') {
+    strcpy_P(buffer, MORSE_NUMBERS[sign - '0']);
+    return String(buffer);
+  }
+
+  return "";
 }
 
 /////////////////////////////////////////////////////////////////
 /// DecodeMorseCode
 ///////////////////////////////////////////////////////////////// 
-String DecodeMorseCode(String code)
-{
-  for (int i=0; i<26; i++)
-  {
-    if (strcmp( MORSE_LETTERS[i],code.c_str() ) == 0)
-    {
-      Serial.print(LETTERS[i]);
-      return LETTERS[i];
+String DecodeMorseCode(String code) {
+  for (int i = 0; i < 26; i++) {
+    char buffer[6];
+    strcpy_P(buffer, MORSE_LETTERS[i]);
+    if (strcmp(buffer, code.c_str()) == 0) {
+      char letterChar = pgm_read_byte(&LETTERS[i]);
+      return String(letterChar);
     }
   }
 
-  for (int i=0; i<10; i++)
-  {
-    if (strcmp( MORSE_NUMBERS[i], code.c_str()) == 0)
-    {
-      Serial.print(i);
-      return String(i);
+  for (int i = 0; i < 10; i++) {
+    char buffer[6];
+    strcpy_P(buffer, MORSE_NUMBERS[i]);
+    if (strcmp(buffer, code.c_str()) == 0) {
+      return String(char('0' + i));
     }
   }
-  
+
   return "*";
 }
 
@@ -727,14 +728,14 @@ void ShowTrainerGiveScreen()
 
   // Zufälligen Buchstaben aus aktiver Liste wählen
   int idx = random(0, selectedLetters.length());
-  currentTrainerLetter = selectedLetters[idx];
+  char letter = pgm_read_byte(&LETTERS[idx]);
+  currentTrainerLetter = letter;
 
-  Serial.println(selectedLetters);
-  Serial.println(currentTrainerLetter);
-
-  // Buchstaben anzeigen
   char buf[2] = { currentTrainerLetter, '\0' };
   display.print(buf, 4, 7);
+
+  DEBUG_PRINTLN(selectedLetters);
+  DEBUG_PRINTLN(currentTrainerLetter);
 
   decoderString = "";
   showTrainerFeedback = false;
@@ -789,14 +790,14 @@ void CalculateTimes(char wpm)
     letterPause = 3 * w;
     wordPause   = 7 * w;
 
-    Serial.print("Pause:");
-    Serial.println(beepPause);
+    DEBUG_PRINT("Pause:");
+    DEBUG_PRINTLN(beepPause);
 
-    Serial.print("Short:");
-    Serial.println(beepShort);
+    DEBUG_PRINT("Short:");
+    DEBUG_PRINTLN(beepShort);
 
-    Serial.print("Long:");
-    Serial.println(beepLong);
+    DEBUG_PRINT("Long:");
+    DEBUG_PRINTLN(beepLong);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -833,7 +834,7 @@ String ReadTextFromEEPROM(byte addr)
     if(readValueChar != '@')
       retVal += readValueChar;
   }
-  Serial.println(retVal);
+  DEBUG_PRINTLN(retVal);
   return retVal;
 }
 
