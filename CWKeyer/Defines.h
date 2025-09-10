@@ -8,6 +8,8 @@
 #define KEYER_LONG_PIN 13 //D7
 #define MODE_BUTTON_PIN 16 //D0
 #define SPEAKER_PIN 14 //D5
+#define SCL 5 //D1
+#define SDA 4 //D2
 #define NO_KEY 999
 
 #define CLICKS_PER_STEP   4 
@@ -42,9 +44,10 @@
 ///////////////////////
 
 // SETUP MENU /////////
-#define SETUP_MENU_COUNT 2
+#define SETUP_MENU_COUNT 3
 #define SETUP_SPEAKER 1
-#define SETUP_BACK 2
+#define SETUP_SETTINGS 2
+#define SETUP_BACK 3
 ///////////////////////
 
 // SETUP CW_KEYER /////////

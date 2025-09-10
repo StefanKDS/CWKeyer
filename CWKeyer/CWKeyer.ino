@@ -1,7 +1,6 @@
 #include <ESP8266WiFi.h> 
 #include <ESP8266WebServer.h>
 #include "WebPage.h"
-
 #include <Wire.h>
 #include "Rotary.h"
 #include "ESPOLED.h"
@@ -26,11 +25,8 @@ void rotate(Rotary& r);
 void ReactOnButtonClick();
 void ProcessBeep(short beepoLength, char outputChar);
 void ProcessSign(char sign);
-
-// Non-blocking helpers
 void startBeep(unsigned int length, char symbol);
 void updateBeep();
-bool canStartNext(); // optional helper
 void startPlayback(String text);
 void updatePlayback();
 
@@ -38,7 +34,7 @@ void updatePlayback();
 // Objects
 /////////////////////////////////////////////////////////////////
 Rotary r;
-OLED display(4, 5,0x3c,0);
+OLED display(SDA, SCL, 0x3c, 0);
 ESP8266WebServer server(80);
 
 /////////////////////////////////////////////////////////////////
@@ -71,20 +67,12 @@ unsigned int elementGap = 0; // entspricht inter-element gap (1T)
 unsigned int letterExtra = 0;
 unsigned int wordExtra = 0;
 
-// Legacy timing vars (für Kompatibilität mit Rest des Codes)
-short beepLong;
-short beepShort;
-short beepPause;
-short letterPause;
-short wordPause;
-
 char wpm = START_POS;
 bool speed_mode = false;
 bool speakerOn = true;
+bool settingsOn = false;
 double key_activated;
 short char_on_screen = -1;
-
-bool pause = false;
 
 byte selected_menu_item = SETUP_SPEAKER;
 byte actual_menu = MAIN_MENU;
@@ -96,7 +84,6 @@ const char* TEXT_2 = "input2";
 
 String decoderString;
 String selectedLetters = ""; // Globale Variable für die Auswahl
-bool showTrainerFeedback;
 char currentTrainerLetter;
 
 int State = STATE_IDLE;
@@ -104,14 +91,16 @@ int State = STATE_IDLE;
 /////////////////////////////////////////////////////////////////
 // notFound
 /////////////////////////////////////////////////////////////////
-void notFound() {
+void notFound() 
+{
   server.send(404, "text/html", wrapInPage("<p>Seite nicht gefunden</p>"));
 }
 
 /////////////////////////////////////////////////////////////////
 // handleRoot
 /////////////////////////////////////////////////////////////////
-void handleRoot() {
+void handleRoot() 
+{
   String page = index_html;
   String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
   String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
@@ -129,11 +118,14 @@ void handleRoot() {
 /////////////////////////////////////////////////////////////////
 // handleSaveLetters
 /////////////////////////////////////////////////////////////////
-void handleSaveLetters() {
+void handleSaveLetters() 
+{
   String selected = "";
   int args = server.args();
-  for (int i = 0; i < args; i++) {
-    if (server.argName(i) == "letters") {
+  for (int i = 0; i < args; i++) 
+  {
+    if (server.argName(i) == "letters") 
+    {
       selected += server.arg(i);
     }
   }
@@ -147,12 +139,16 @@ void handleSaveLetters() {
 /////////////////////////////////////////////////////////////////
 // handleGet
 /////////////////////////////////////////////////////////////////
-void handleGet() {
+void handleGet() 
+{
   String inputParam = "none";
-  if (server.hasArg(TEXT_1)) {
+  if (server.hasArg(TEXT_1)) 
+  {
     WriteTextToEEPROM(EEPROM_MEM1_ADDR, server.arg(TEXT_1));
     inputParam = TEXT_1;
-  } else if (server.hasArg(TEXT_2)) {
+  } 
+  else if (server.hasArg(TEXT_2)) 
+  {
     WriteTextToEEPROM(EEPROM_MEM2_ADDR, server.arg(TEXT_2));
     inputParam = TEXT_2;
   }
@@ -163,17 +159,21 @@ void handleGet() {
 /////////////////////////////////////////////////////////////////
 // generateLetterCheckboxes
 /////////////////////////////////////////////////////////////////
-String generateLetterCheckboxes() {
+String generateLetterCheckboxes() 
+{
   String html = "";
-  for (int i = 0; i < 26; i++) {
+  for (int i = 0; i < 26; i++) 
+  {
     char letterChar = pgm_read_byte(&LETTERS[i]); // korrekt aus PROGMEM lesen
     String letter = String(letterChar);          // in String umwandeln
     bool checked = selectedLetters.indexOf(letter) != -1;
     html += "<input type='checkbox' name='letters' value='" + letter + "' id='l" + String(i) + "'";
-    if (checked) html += " checked";
+    if (checked) 
+      html += " checked";
     html += ">";
     html += "<label for='l" + String(i) + "'>" + letter + "</label> ";
-    if ((i+1) % 7 == 0) html += "<br>";
+    if ((i+1) % 7 == 0) 
+      html += "<br>";
   }
   return html;
 }
@@ -185,7 +185,10 @@ void setup()
 {
   DEBUG_BEGIN(SERIAL_SPEED);
 
-  // EEPROM ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // Wifi und server off
+  SwitchSettings(0);
+
+  // EEPROM
   DEBUG_PRINTLN("- EEPROM INIT -");
   EEPROM.begin(EEPROM_SIZE);
   
@@ -214,79 +217,53 @@ void setup()
   SwitchSpeaker((byte)value);
 
   selectedLetters = ReadTextFromEEPROM(0x40); // Auswahl laden
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // WEB SERVER ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  WiFi.softAP(ssid, password);
-
-  IPAddress Ip(192, 168, 4, 2);    //setto IP Access Point same as gateway
-  IPAddress NMask(255, 255, 255, 0);
-  WiFi.softAPConfig(Ip, Ip, NMask);
-
-  // Print ESP8266 Local IP Address
-  DEBUG_PRINTLN(WiFi.localIP());
-
-  server.on("/", handleRoot);
-  server.on("/save_letters", handleSaveLetters);
-  server.on("/get", handleGet);
-  server.onNotFound(notFound);
-  server.begin();
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-  // OLED Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // OLED Init 
   DEBUG_PRINTLN("- BUZZER INIT -");
   // Initialize display
   display.begin();
 
   ShowMainScreen();
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // Rotary Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // Rotary Init
   r.begin(ROTARY_PIN1, ROTARY_PIN2, CLICKS_PER_STEP);
   r.setChangedHandler(rotate);
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // Beep Init +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // Beep Init 
   DEBUG_PRINTLN("- BUZZER INIT -");
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN,0);
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // Keyer +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // Keyer
   DEBUG_PRINTLN("- KEYER INIT -");
   pinMode(KEYER_SHORT_PIN, INPUT_PULLUP);
   pinMode(KEYER_LONG_PIN, INPUT_PULLUP);
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // MODE BTN ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // MODE BTN
   DEBUG_PRINTLN("- BUTTON INIT -");
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
-  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   pinMode(SPEAKER_PIN, OUTPUT);
 }
 
 /////////////////////////////////////////////////////////////////
-// startBeep / updateBeep / canStartNext
+// startBeep 
 /////////////////////////////////////////////////////////////////
 void startBeep(unsigned int length, char symbol)
 {
-  // start continuous tone (we'll stop manually in updateBeep)
   noTone(SPEAKER_PIN);
   tone(SPEAKER_PIN, 1000);
-  if (speakerOn) digitalWrite(BUZZER_PIN, HIGH);
+  if (speakerOn) 
+    digitalWrite(BUZZER_PIN, HIGH);
 
   beeping = true;
   beepEnd = millis() + length;
   DEBUG_PRINT(symbol);
 }
 
-bool canStartNext()
-{
-  // true wenn kein Ton läuft und keine Pause aktiv ist
-  return !beeping && !inPause;
-}
-
+/////////////////////////////////////////////////////////////////
+// updateBeep
+/////////////////////////////////////////////////////////////////
 void updateBeep()
 {
  unsigned long now = millis();
@@ -299,7 +276,7 @@ void updateBeep()
 
       // Starte Pause nach Ton
       inPause = true;
-      pauseEnd = now + beepPause;
+      pauseEnd = now + elementGap;
     }
 
     if(inPause && now >= pauseEnd)
@@ -310,7 +287,7 @@ void updateBeep()
 }
 
 /////////////////////////////////////////////////////////////////
-// Non-blocking Playback
+// startPlayback
 /////////////////////////////////////////////////////////////////
 void startPlayback(String text)
 {
@@ -322,12 +299,17 @@ void startPlayback(String text)
   nextActionTime = millis(); // sofort loslegen
 }
 
+/////////////////////////////////////////////////////////////////
+// updatePlayback
+/////////////////////////////////////////////////////////////////
 void updatePlayback()
 {
-  if (!playing) return;
+  if (!playing) 
+    return;
 
   unsigned long now = millis();
-  if (now < nextActionTime) return;
+  if (now < nextActionTime) 
+    return;
 
   // Wenn wir gerade kein Morse für das aktuelle Zeichen haben -> nächstes Zeichen holen
   if (currentMorse.length() == 0)
@@ -383,7 +365,11 @@ void CalcDisplayPosition( short chars_on_display, int* r, int* c )
 /////////////////////////////////////////////////////////////////
 void loop() 
 {
-    server.handleClient();
+    if (settingsOn) 
+    {
+      server.handleClient();
+    }
+    
     r.loop();
 
     // Encoder Button
@@ -475,7 +461,7 @@ void StateMachine(int key)
       // Nur starten, wenn aktuell kein Beep oder Pause läuft
       if(!beeping && !inPause)
       {
-        ProcessBeep(beepShort, '.');
+        ProcessBeep(dit_len, '.');
         decoderString += ".";
         key_activated = millis();
       }
@@ -486,7 +472,7 @@ void StateMachine(int key)
     {
       if(!beeping && !inPause)
       {
-        ProcessBeep(beepLong, '-');
+        ProcessBeep(dah_len, '-');
         decoderString += "-";
         key_activated = millis();
       }
@@ -497,14 +483,6 @@ void StateMachine(int key)
     {
       ReactOnButtonClick();
     }
-  }
-  else if(State == STATE_MEM)
-  {
-    // MEM-Mode Aktionen
-  }
-  else if(State == STATE_TRAINER)
-  {
-    // Trainer-Mode Aktionen
   }
 }
 
@@ -645,6 +623,24 @@ void ReactOnButtonClick()
       return;
     }
 
+    if(selected_menu_item == SETUP_SETTINGS)
+    {
+      if(settingsOn == true)
+      {
+        SwitchSettings(false);
+        display.print("Settings OFF", 3,4);
+        DEBUG_PRINTLN("Settings OFF");
+      }
+      else
+      {
+        SwitchSettings(true);
+        display.print("Settings ON ", 3,4);
+        DEBUG_PRINTLN("Settings ON ");
+      }
+
+      return;
+    }
+
     if(selected_menu_item == SETUP_BACK)
     {
       DEBUG_PRINTLN("Setup Back");
@@ -669,13 +665,53 @@ void SwitchSpeaker(byte value)
 }
 
 /////////////////////////////////////////////////////////////////
+/// SwitchSettings
+/////////////////////////////////////////////////////////////////
+void SwitchSettings(byte value)
+{
+  if(value == 0) 
+  {
+    settingsOn = false;
+
+    // WLAN & Server stoppen
+    server.stop();
+    WiFi.disconnect(true);   // trennt alles
+    WiFi.mode(WIFI_OFF);     // schaltet WLAN wirklich aus
+    DEBUG_PRINTLN("WiFi/Server OFF");
+  }
+  else 
+  {
+    settingsOn = true;
+
+    // WLAN & Server starten
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssid, password);
+
+    IPAddress Ip(192, 168, 4, 2);
+    IPAddress NMask(255, 255, 255, 0);
+    WiFi.softAPConfig(Ip, Ip, NMask);
+
+    DEBUG_PRINTLN(WiFi.localIP());
+
+    server.on("/", handleRoot);
+    server.on("/save_letters", handleSaveLetters);
+    server.on("/get", handleGet);
+    server.onNotFound(notFound);
+    server.begin();
+
+    DEBUG_PRINTLN("WiFi/Server ON");
+  }
+}
+
+/////////////////////////////////////////////////////////////////
 /// ProcessBeep  (non-blocking)
 /////////////////////////////////////////////////////////////////
 void ProcessBeep(short beepoLength, char outputChar)
 {
     tone(SPEAKER_PIN, 1000); 
     // Ton starten
-    if(speakerOn) {
+    if(speakerOn) 
+    {
         digitalWrite(BUZZER_PIN, HIGH);
     }
 
@@ -716,15 +752,18 @@ String EncodeChar(char sign)
 {
   char buffer[6]; // max Morse-Zeichen + null-Terminator
 
-  if (sign >= 'a' && sign <= 'z') {
+  if (sign >= 'a' && sign <= 'z') 
+  {
     strcpy_P(buffer, MORSE_LETTERS[sign - 'a']);
     return String(buffer);
   } 
-  else if (sign >= 'A' && sign <= 'Z') {
+  else if (sign >= 'A' && sign <= 'Z') 
+  {
     strcpy_P(buffer, MORSE_LETTERS[sign - 'A']);
     return String(buffer);
   } 
-  else if (sign >= '0' && sign <= '9') {
+  else if (sign >= '0' && sign <= '9') 
+  {
     strcpy_P(buffer, MORSE_NUMBERS[sign - '0']);
     return String(buffer);
   }
@@ -735,20 +774,25 @@ String EncodeChar(char sign)
 /////////////////////////////////////////////////////////////////
 /// DecodeMorseCode
 ///////////////////////////////////////////////////////////////// 
-String DecodeMorseCode(String code) {
-  for (int i = 0; i < 26; i++) {
+String DecodeMorseCode(String code) 
+{
+  for (int i = 0; i < 26; i++) 
+  {
     char buffer[6];
     strcpy_P(buffer, MORSE_LETTERS[i]);
-    if (strcmp(buffer, code.c_str()) == 0) {
+    if (strcmp(buffer, code.c_str()) == 0) 
+    {
       char letterChar = pgm_read_byte(&LETTERS[i]);
       return String(letterChar);
     }
   }
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++) 
+  {
     char buffer[6];
     strcpy_P(buffer, MORSE_NUMBERS[i]);
-    if (strcmp(buffer, code.c_str()) == 0) {
+    if (strcmp(buffer, code.c_str()) == 0) 
+    {
       return String(char('0' + i));
     }
   }
@@ -833,7 +877,8 @@ void ShowTrainerGiveScreen()
   display.clear();
 
   // Zufälligen Buchstaben aus aktiver Liste wählen
-  if (selectedLetters.length() == 0) {
+  if (selectedLetters.length() == 0) 
+  {
     // Fallback: alle Buchstaben
     selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   }
@@ -850,7 +895,6 @@ void ShowTrainerGiveScreen()
   DEBUG_PRINTLN(currentTrainerLetter);
 
   decoderString = "";
-  showTrainerFeedback = false;
 }
 
 /////////////////////////////////////////////////////////////////
@@ -868,10 +912,13 @@ void ShowSetupScreen()
   else
     display.print("Speaker OFF", 2,4);
 
-  display.print("Back", 3,4);
+  if(settingsOn == true)
+    display.print("Settings ON  ", 3,4);
+  else
+    display.print("Settings OFF", 3,4);
 
-  display.print("192.168.4.2", 5,4);
-
+  display.print("Back", 4,4);
+  display.print("192.168.4.2", 6,4);
   display.print(">", 2,1);
 }
 
@@ -905,13 +952,6 @@ void CalculateTimes(char wpm)
 
   // Für Wortpause: insgesamt 7T => zusätzlich 6T (neben dem 1T)
   wordExtra = 7 * T - elementGap;   // = 6T
-
-  // Pflege legacy-Variablen (falls andere Teile des Codes diese verwenden)
-  beepShort = dit_len;
-  beepLong  = dah_len;
-  beepPause = elementGap;
-  letterPause = 3 * T; // legacy full letter pause
-  wordPause = 7 * T;   // legacy full word pause
 
   DEBUG_PRINT("T: "); DEBUG_PRINTLN(T);
   DEBUG_PRINT("dit: "); DEBUG_PRINTLN(dit_len);
@@ -948,9 +988,11 @@ void WriteTextToEEPROM(byte addr, String text)
 String ReadTextFromEEPROM(byte addr)
 {
   String retVal;
-  for (int i = addr; i < 128; i++) {
+  for (int i = addr; i < 128; i++) 
+  {
     byte readValue = EEPROM.read(i);
-    if (readValue == 0) break; // Nullterminator = Ende
+    if (readValue == 0)
+      break; // Nullterminator = Ende
     char readValueChar = char(readValue);
     if(readValueChar != '@')
       retVal += readValueChar;
