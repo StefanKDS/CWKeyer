@@ -399,15 +399,35 @@ void loop()
     updateBeep();
     updatePlayback();
 
+    if(actual_menu == TRAINER_HEAR_SCREEN)
+    {
+      unsigned long now = millis();
+
+      if(decoderString.length() > 0 && !beeping && !inPause && (now - lastKeyTime) >= letterExtra)
+      {
+        String decodedLetter = DecodeMorseCode(decoderString);
+
+        char buf[2] = { decodedLetter[0], '\0' }; // char-Array für Display
+
+        DEBUG_PRINTLN(buf[0]);
+
+        if(buf[0] == 'E' ||  buf[0] == 'T')
+        {
+          decoderString = "";
+          ShowTrainerHearScreen();
+        }
+      }
+    }
+
     // MONITOR oder TRAINER
     if(actual_menu == MONITOR || actual_menu == TRAINER_GIVE_RANDOM_SCREEN || actual_menu == TRAINER_GIVE_AZ_SCREEN)
     {
         unsigned long now = millis();
 
-    // Prüfen, ob ein Buchstabe fertig ist: kein Beep mehr und
-    // seit letztem Element mindestens letterExtra Zeit vergangen
-    if(decoderString.length() > 0 && !beeping && !inPause && (now - lastKeyTime) >= letterExtra)
-    {
+      // Prüfen, ob ein Buchstabe fertig ist: kein Beep mehr und
+      // seit letztem Element mindestens letterExtra Zeit vergangen
+      if(decoderString.length() > 0 && !beeping && !inPause && (now - lastKeyTime) >= letterExtra)
+      {
         String decodedLetter = DecodeMorseCode(decoderString);
 
         char buf[2] = { decodedLetter[0], '\0' }; // char-Array für Display
@@ -608,6 +628,12 @@ void ReactOnButtonClick()
   }
 
   if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
+  {
+    ShowTrainerScreen();
+    return;
+  }
+
+  if(actual_menu == TRAINER_HEAR_SCREEN)
   {
     ShowTrainerScreen();
     return;
@@ -828,7 +854,7 @@ void ShowMainScreen()
   actual_menu = MAIN_MENU;
   selected_menu_item = 1;
   display.clear();
-  display.print("CWKeyer v0.41", 0,1);
+  display.print("CWKeyer v0.42", 0,1);
 
   display.print("CW-Keyer", 2,4);
   display.print("Monitor", 3,4);
@@ -885,7 +911,31 @@ void ShowTrainerScreen()
 /////////////////////////////////////////////////////////////////
 void ShowTrainerHearScreen()
 {
+  actual_menu = TRAINER_HEAR_SCREEN;
+  selected_menu_item = 1;
+  display.clear();
 
+  // Zufälligen Buchstaben aus aktiver Liste wählen
+  if (selectedLetters.length() == 0) 
+  {
+    // Fallback: alle Buchstaben
+    selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  } 
+
+  char buf[6];
+
+  for(int i=0; i<5; i++)
+  {
+    int idx = random(0, selectedLetters.length());
+    char letter = selectedLetters[idx];
+    buf[i] = letter;
+  }
+
+  buf[5] = '\0';
+  startPlayback(String(buf));
+  display.print(buf, 4, 5);
+
+  decoderString = "";
 }
 
 /////////////////////////////////////////////////////////////////

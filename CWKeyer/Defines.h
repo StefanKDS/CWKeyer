@@ -42,6 +42,7 @@
 
 #define TRAINER_GIVE_RANDOM_SCREEN 10
 #define TRAINER_GIVE_AZ_SCREEN 11
+#define TRAINER_HEAR_SCREEN 20
 ///////////////////////
 
 // SETUP MENU /////////
