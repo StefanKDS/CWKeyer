@@ -40,7 +40,8 @@
 #define TRAINER 3
 #define SETUP 4
 
-#define TRAINER_GIVE_SCREEN 10
+#define TRAINER_GIVE_RANDOM_SCREEN 10
+#define TRAINER_GIVE_AZ_SCREEN 11
 ///////////////////////
 
 // SETUP MENU /////////
@@ -59,10 +60,11 @@
 ///////////////////////
 
 // TRAINER MENU /////////
-#define TRAINER_MENU_COUNT 3
+#define TRAINER_MENU_COUNT 4
 #define TRAINER_HEAR 1
-#define TRAINER_GIVE 2
-#define TRAINER_BACK 3
+#define TRAINER_GIVE_RANDOM 2
+#define TRAINER_GIVE_AZ 3
+#define TRAINER_BACK 4
 ///////////////////////
 
 // All morse characters

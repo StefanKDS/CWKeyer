@@ -85,6 +85,7 @@ const char* TEXT_2 = "input2";
 String decoderString;
 String selectedLetters = ""; // Globale Variable für die Auswahl
 char currentTrainerLetter;
+short currentAZPosition = -1;
 
 int State = STATE_IDLE;
 
@@ -399,7 +400,7 @@ void loop()
     updatePlayback();
 
     // MONITOR oder TRAINER
-    if(actual_menu == MONITOR || actual_menu == TRAINER_GIVE_SCREEN)
+    if(actual_menu == MONITOR || actual_menu == TRAINER_GIVE_RANDOM_SCREEN || actual_menu == TRAINER_GIVE_AZ_SCREEN)
     {
         unsigned long now = millis();
 
@@ -424,7 +425,7 @@ void loop()
             CalcDisplayPosition(char_on_screen, &r, &c);
             display.print(buf, r, c);
         }
-        else if(actual_menu == TRAINER_GIVE_SCREEN)
+        else if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN || actual_menu == TRAINER_GIVE_AZ_SCREEN)
         {
             if(buf[0] == currentTrainerLetter)
             {
@@ -438,7 +439,10 @@ void loop()
                 ProcessSign(currentTrainerLetter);
             }
             delay(1000);
-            ShowTrainerGiveScreen();
+            if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
+              ShowTrainerGiveRandomScreen();
+            else
+              ShowTrainerGiveAZScreen();
         }
 
         decoderString = ""; // Buffer leeren für das nächste Zeichen
@@ -573,10 +577,19 @@ void ReactOnButtonClick()
       return;
     }
 
-    if (selected_menu_item == TRAINER_GIVE)
+    if (selected_menu_item == TRAINER_GIVE_RANDOM)
     {
-      DEBUG_PRINTLN("Trainer Give");
-      ShowTrainerGiveScreen();
+      DEBUG_PRINTLN("Trainer Give Random");
+      ShowTrainerGiveRandomScreen();
+      return;
+    }
+
+    if (selected_menu_item == TRAINER_GIVE_AZ)
+    {
+      DEBUG_PRINTLN("Trainer Give AZ");
+      selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      currentAZPosition = -1;
+      ShowTrainerGiveAZScreen();
       return;
     }
 
@@ -594,9 +607,16 @@ void ReactOnButtonClick()
     return;
   }
 
-  if(actual_menu == TRAINER_GIVE_SCREEN)
+  if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
   {
-    ShowMainScreen();
+    ShowTrainerScreen();
+    return;
+  }
+
+  if(actual_menu == TRAINER_GIVE_AZ_SCREEN)
+  {
+    selectedLetters = ReadTextFromEEPROM(0x40); 
+    ShowTrainerScreen();
     return;
   }
 
@@ -808,7 +828,7 @@ void ShowMainScreen()
   actual_menu = MAIN_MENU;
   selected_menu_item = 1;
   display.clear();
-  display.print("CWKeyer v0.4", 0,1);
+  display.print("CWKeyer v0.41", 0,1);
 
   display.print("CW-Keyer", 2,4);
   display.print("Monitor", 3,4);
@@ -852,9 +872,10 @@ void ShowTrainerScreen()
   display.clear();
   display.print("Trainer", 0,1);
   display.print("Hear", 2,4);
-  display.print("Give", 3,4);
+  display.print("Give Random", 3,4);
+  display.print("Give A-Z", 4,4);
 
-  display.print("Back", 4,4);
+  display.print("Back", 5,4);
 
   display.print(">", 2,1);
 }
@@ -868,11 +889,11 @@ void ShowTrainerHearScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowTrainerGiveScreen
+// ShowTrainerGiveRandomScreen
 /////////////////////////////////////////////////////////////////
-void ShowTrainerGiveScreen()
+void ShowTrainerGiveRandomScreen()
 {
-  actual_menu = TRAINER_GIVE_SCREEN;
+  actual_menu = TRAINER_GIVE_RANDOM_SCREEN;
   selected_menu_item = 1;
   display.clear();
 
@@ -891,6 +912,32 @@ void ShowTrainerGiveScreen()
 
   DEBUG_PRINT("SelectedLetters: ");
   DEBUG_PRINTLN(selectedLetters);
+  DEBUG_PRINT("CurrentTrainerLetter: ");
+  DEBUG_PRINTLN(currentTrainerLetter);
+
+  decoderString = "";
+}
+
+/////////////////////////////////////////////////////////////////
+// ShowTrainerGiveAZScreen
+/////////////////////////////////////////////////////////////////
+void ShowTrainerGiveAZScreen()
+{
+  actual_menu = TRAINER_GIVE_AZ_SCREEN;
+  selected_menu_item = 1;
+  display.clear();
+
+  currentAZPosition++;
+
+  if(currentAZPosition > 25)
+    currentAZPosition = 0;
+
+  char letter = selectedLetters[currentAZPosition];
+  currentTrainerLetter = letter;
+
+  char buf[2] = { currentTrainerLetter, '\0' };
+  display.print(buf, 4, 7);
+
   DEBUG_PRINT("CurrentTrainerLetter: ");
   DEBUG_PRINTLN(currentTrainerLetter);
 
