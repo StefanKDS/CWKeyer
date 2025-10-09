@@ -865,7 +865,10 @@ void ShowMainScreen()
   actual_menu = MAIN_MENU;
   selected_menu_item = 1;
   display.clear();
-  display.print("CWKeyer v0.43", 0,1);
+
+  char str[20];
+  snprintf(str, sizeof(str), "CWKeyer v%s", VERSION);
+  display.print(str, 0, 1);
 
   display.print("CW-Keyer", 2,4);
   display.print("Monitor", 3,4);
@@ -898,8 +901,8 @@ void ShowKeyerScreen()
 
   display.print(">", 2,1);
 
-  char string[128];
-  sprintf(string, "Speed: %i WPM", wpm);
+  char string[20];
+  snprintf(string, sizeof(string), "Speed: %i WPM", wpm);
   display.print(string, 6,2);
 }
 
@@ -1031,8 +1034,8 @@ void ShowSetupScreen()
     display.print("Settings OFF", 3,4);
   display.print("Farnsworth", 4,4);
 
-  char string[128];
-  sprintf(string, "FW: %i WPM", fwpm);
+  char string[20];
+  snprintf(string, sizeof(string), "FW: %i WPM", fwpm);
   display.print(string, 6,2);
 
   display.print("Back", 5,4);
@@ -1156,8 +1159,8 @@ void rotate(Rotary& r)
       }
     }
 
-    char string[128];
-    sprintf(string, "Speed: %i WPM", wpm);
+    char string[20];
+    snprintf(string, sizeof(string), "Speed: %i WPM", wpm);
     display.print(string, 6,2);
   
     CalculateTimes(wpm, fwpm);
@@ -1180,8 +1183,8 @@ void rotate(Rotary& r)
       }
     }
 
-    char string[128];
-    sprintf(string, "FW: %i WPM", fwpm);
+    char string[20];
+    snprintf(string, sizeof(string), "FW: %i WPM", fwpm);
     display.print(string, 6,2);
   
     CalculateTimes(wpm, fwpm);

@@ -1,6 +1,8 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
+#define VERSION "0.43"
+
 #define ROTARY_PIN1 2 //D4
 #define ROTARY_PIN2 0 //D3
 #define BUZZER_PIN 15 //D8
