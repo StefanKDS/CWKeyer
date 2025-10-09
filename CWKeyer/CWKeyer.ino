@@ -12,7 +12,7 @@
 // DEKLARATIONEN
 /////////////////////////////////////////////////////////////////
 
-void CalculateTimes(char wpm);
+void CalculateTimes(char wpm, char fwpm);
 String ReadTextFromEEPROM(byte addr);
 void SwitchSpeaker(byte value);
 void WriteTextToEEPROM(byte addr, String text);
@@ -68,7 +68,9 @@ unsigned int letterExtra = 0;
 unsigned int wordExtra = 0;
 
 char wpm = START_POS;
+char fwpm = wpm;
 bool speed_mode = false;
+bool fspeed_mode = false;
 bool speakerOn = true;
 bool settingsOn = false;
 double key_activated;
@@ -206,7 +208,20 @@ void setup()
   {
     wpm = value;
   }
-  CalculateTimes(wpm);
+
+  value = EEPROM.read(EEPROM_FWPM_ADDR);
+  DEBUG_PRINT("Read fwpm: ");
+  DEBUG_PRINTLN(value, DEC);
+  if(value >= 100 || value < 0)
+  {
+    fwpm = START_POS;
+  }
+  else
+  {
+    fwpm = value;
+  }
+
+  CalculateTimes(wpm, fwpm);
 
   ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
   ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
@@ -399,26 +414,6 @@ void loop()
     updateBeep();
     updatePlayback();
 
-    if(actual_menu == TRAINER_HEAR_SCREEN)
-    {
-      unsigned long now = millis();
-
-      if(decoderString.length() > 0 && !beeping && !inPause && (now - lastKeyTime) >= letterExtra)
-      {
-        String decodedLetter = DecodeMorseCode(decoderString);
-
-        char buf[2] = { decodedLetter[0], '\0' }; // char-Array für Display
-
-        DEBUG_PRINTLN(buf[0]);
-
-        if(buf[0] == 'E' ||  buf[0] == 'T')
-        {
-          decoderString = "";
-          ShowTrainerHearScreen();
-        }
-      }
-    }
-
     // MONITOR oder TRAINER
     if(actual_menu == MONITOR || actual_menu == TRAINER_GIVE_RANDOM_SCREEN || actual_menu == TRAINER_GIVE_AZ_SCREEN)
     {
@@ -464,9 +459,16 @@ void loop()
             else
               ShowTrainerGiveAZScreen();
         }
+        else if(actual_menu == TRAINER_HEAR_SCREEN)
+        {
+          if(buf[0] == 'E' ||  buf[0] == 'T')
+        {
+          ShowTrainerHearScreen();
+        }
 
         decoderString = ""; // Buffer leeren für das nächste Zeichen
       }
+    }
     }
 
     StateMachine(NO_KEY);
@@ -656,13 +658,13 @@ void ReactOnButtonClick()
       if(speakerOn == true)
       {
         SwitchSpeaker(false);
-        display.print("Speaker OFF", 2,4);
+        display.print("Speaker OFF", 1,4);
         DEBUG_PRINTLN("Speaker OFF");
       }
       else
       {
         SwitchSpeaker(true);
-        display.print("Speaker ON ", 2,4);
+        display.print("Speaker ON ", 1,4);
         DEBUG_PRINTLN("Speaker ON ");
       }
 
@@ -685,6 +687,15 @@ void ReactOnButtonClick()
       }
 
       return;
+    }
+
+    if(selected_menu_item == SETUP_FARNSWORTH && fspeed_mode == false)
+    {
+      fspeed_mode = true;
+    }
+    else if(selected_menu_item == SETUP_FARNSWORTH && fspeed_mode == true)
+    {
+      fspeed_mode = false;
     }
 
     if(selected_menu_item == SETUP_BACK)
@@ -854,12 +865,17 @@ void ShowMainScreen()
   actual_menu = MAIN_MENU;
   selected_menu_item = 1;
   display.clear();
-  display.print("CWKeyer v0.42", 0,1);
+  display.print("CWKeyer v0.43", 0,1);
 
   display.print("CW-Keyer", 2,4);
   display.print("Monitor", 3,4);
   display.print("Trainer", 4,4);
   display.print("Setup", 5,4);
+
+  if(settingsOn == true)
+        display.print("192.168.4.2", 6,4);
+      else
+        display.print("           ", 6,4);
 
    display.print(">", 2,1);
 }
@@ -1013,9 +1029,13 @@ void ShowSetupScreen()
     display.print("Settings ON  ", 3,4);
   else
     display.print("Settings OFF", 3,4);
+  display.print("Farnsworth", 4,4);
 
-  display.print("Back", 4,4);
-  display.print("192.168.4.2", 6,4);
+  char string[128];
+  sprintf(string, "FW: %i WPM", fwpm);
+  display.print(string, 6,2);
+
+  display.print("Back", 5,4);
   display.print(">", 2,1);
 }
 
@@ -1033,24 +1053,29 @@ void ShowMonitorScreen()
 /////////////////////////////////////////////////////////////////
 // CalculateTimes
 /////////////////////////////////////////////////////////////////
-void CalculateTimes(char wpm)
+void CalculateTimes(char wpm, char fwpm)
 {
-  if (wpm <= 0) wpm = 1;
-  unsigned int T = 1200 / wpm; // Grundeinheit in ms
+  if (wpm <= 0) 
+    wpm = 1;
+  if (fwpm > wpm) 
+    fwpm = wpm;  // Farnsworth darf nicht schneller sein
+
+  unsigned int T = 1200 / wpm;    // Basis-Zeit (Elementlänge)
+  unsigned int Tfw = 1200 / fwpm; // Farnsworth-Basis (verlängerte Pausen)
 
   T_unit    = T;
-  dit_len   = T;        // 1T
-  dah_len   = 3 * T;    // 3T
-  elementGap = T;       // Pause zwischen Elementen (1T)
+  dit_len   = T;         // 1T
+  dah_len   = 3 * T;     // 3T
+  elementGap = T;        // 1T zwischen Elementen
 
-  // Wenn wir nach jedem Element schon 1T einplanen,
-  // brauchen wir für Buchstaben noch zusätzlich 2T (3T total):
-  letterExtra = 3 * T - elementGap; // = 2T
+  // Zwischenbuchstabenpause: 3T nach Farnsworth, aber 1T ist schon in elementGap enthalten
+  letterExtra = (3 * Tfw) - elementGap;  // verlängerte Buchstabenpause
 
-  // Für Wortpause: insgesamt 7T => zusätzlich 6T (neben dem 1T)
-  wordExtra = 7 * T - elementGap;   // = 6T
+  // Zwischenwortpause: 7T nach Farnsworth, aber 1T ist schon in elementGap enthalten
+  wordExtra = (7 * Tfw) - elementGap;    // verlängerte Wortpause
 
   DEBUG_PRINT("T: "); DEBUG_PRINTLN(T);
+  DEBUG_PRINT("Tfw: "); DEBUG_PRINTLN(Tfw);
   DEBUG_PRINT("dit: "); DEBUG_PRINTLN(dit_len);
   DEBUG_PRINT("dah: "); DEBUG_PRINTLN(dah_len);
   DEBUG_PRINT("elementGap: "); DEBUG_PRINTLN(elementGap);
@@ -1135,8 +1160,32 @@ void rotate(Rotary& r)
     sprintf(string, "Speed: %i WPM", wpm);
     display.print(string, 6,2);
   
-    CalculateTimes(wpm);
+    CalculateTimes(wpm, fwpm);
     EEPROM.write(EEPROM_WPM_ADDR, wpm);
+    EEPROM.commit();
+    return;
+  }
+
+  if(actual_menu == SETUP && fspeed_mode == true)
+  {
+    if(r.getDirection() == 1)
+    {
+         fwpm += STEP_SIZE;
+    }
+    else
+    {
+      if(wpm > 0)
+      {
+        fwpm -= STEP_SIZE;
+      }
+    }
+
+    char string[128];
+    sprintf(string, "FW: %i WPM", fwpm);
+    display.print(string, 6,2);
+  
+    CalculateTimes(wpm, fwpm);
+    EEPROM.write(EEPROM_FWPM_ADDR, fwpm);
     EEPROM.commit();
     return;
   }

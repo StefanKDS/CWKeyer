@@ -1,8 +1,8 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
-#define ROTARY_PIN1 0 //D3
-#define ROTARY_PIN2 2 //D4
+#define ROTARY_PIN1 2 //D4
+#define ROTARY_PIN2 0 //D3
 #define BUZZER_PIN 15 //D8
 #define KEYER_SHORT_PIN 12 //D6
 #define KEYER_LONG_PIN 13 //D7
@@ -23,7 +23,8 @@
 #define EEPROM_WPM_ADDR 0   // 1 byte
 #define EEPROM_MEM1_ADDR 1  // 128 byte
 #define EEPROM_MEM2_ADDR 129   // 128 byte
-#define EEPROM_SPEAKER_ADDR 258
+#define EEPROM_SPEAKER_ADDR 258 // 1 byte
+#define EEPROM_FWPM_ADDR 259 // 1 byte
 ///////////////////////
 
 // STATES ///////////////
@@ -46,10 +47,11 @@
 ///////////////////////
 
 // SETUP MENU /////////
-#define SETUP_MENU_COUNT 3
+#define SETUP_MENU_COUNT 4
 #define SETUP_SPEAKER 1
 #define SETUP_SETTINGS 2
-#define SETUP_BACK 3
+#define SETUP_FARNSWORTH 3
+#define SETUP_BACK 4
 ///////////////////////
 
 // SETUP CW_KEYER /////////
