@@ -873,9 +873,9 @@ void ShowMainScreen()
   display.print("Setup", 5,4);
 
   if(settingsOn == true)
-        display.print("192.168.4.2", 6,4);
+        display.print("-192.168.4.2-", 6,2);
       else
-        display.print("           ", 6,4);
+        display.print("             ", 6,2);
 
    display.print(">", 2,1);
 }
