@@ -16,7 +16,7 @@ Address:  192.168.4.2
 
 # Images
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Pictures/Keyer.jpg?raw=true)
+![plot](https://github.com/StefanKDS/CWKeyer/Pictures/Keyer.jpg)
 
 
 # Circuit
