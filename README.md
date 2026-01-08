@@ -16,15 +16,11 @@ Address:  192.168.4.2
 
 # Images
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Pictures/IMG20231118201804.jpg?raw=true)
+![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Pictures/Keyer.jpg?raw=true)
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Pictures/IMG20231118201818.jpg?raw=true)
 
 # Circuit
 
 ![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Circuit/CWKeyer_Circuit.jpg?raw=true)
 
-# My Keyer
-
-![plot](https://github.com/StefanKDS/CWKeyer/blob/main/Pictures/IMG20231119082627.jpg?raw=true)
 
