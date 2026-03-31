@@ -242,7 +242,7 @@ void setup()
   ShowMainScreen();
 
   // Rotary Init
-  r.begin(ROTARY_PIN1, ROTARY_PIN2, CLICKS_PER_STEP);
+  r.begin(ROTARY_PIN2, ROTARY_PIN1, CLICKS_PER_STEP);
   r.setChangedHandler(rotate);
 
   // Beep Init 
@@ -381,9 +381,11 @@ void CalcDisplayPosition( short chars_on_display, int* r, int* c )
 /////////////////////////////////////////////////////////////////
 void loop() 
 {
+    static bool letterProcessed = false; // 🔥 verhindert mehrfaches Anzeigen
+
     if (settingsOn) 
     {
-      server.handleClient();
+        server.handleClient();
     }
     
     r.loop();
@@ -402,73 +404,84 @@ void loop()
     if(shortPressed && !beeping && !inPause) 
     {
         StateMachine(KEYER_SHORT_PIN);
-        lastKeyTime = millis(); // letzte Eingabe merken
+        lastKeyTime = millis();
+        letterProcessed = false; // 🔥 neues Zeichen beginnt
     }
 
     if(longPressed && !beeping && !inPause) 
     {
         StateMachine(KEYER_LONG_PIN);
-        lastKeyTime = millis(); // letzte Eingabe merken
+        lastKeyTime = millis();
+        letterProcessed = false; // 🔥 neues Zeichen beginnt
     }
 
     updateBeep();
     updatePlayback();
 
     // MONITOR oder TRAINER
-    if(actual_menu == MONITOR || actual_menu == TRAINER_GIVE_RANDOM_SCREEN || actual_menu == TRAINER_GIVE_AZ_SCREEN)
+    if(actual_menu == MONITOR || 
+       actual_menu == TRAINER_GIVE_RANDOM_SCREEN || 
+       actual_menu == TRAINER_GIVE_AZ_SCREEN)
     {
         unsigned long now = millis();
 
-      // Prüfen, ob ein Buchstabe fertig ist: kein Beep mehr und
-      // seit letztem Element mindestens letterExtra Zeit vergangen
-      if(decoderString.length() > 0 && !beeping && !inPause && (now - lastKeyTime) >= letterExtra)
-      {
-        String decodedLetter = DecodeMorseCode(decoderString);
-
-        char buf[2] = { decodedLetter[0], '\0' }; // char-Array für Display
-
-        if(actual_menu == MONITOR)
+        // 🔥 Nur EINMAL auslösen!
+        if(decoderString.length() > 0 && 
+           !beeping && 
+           !inPause && 
+           (now - lastKeyTime) >= letterExtra &&
+           !letterProcessed)
         {
-            if(char_on_screen >= 90)
+            letterProcessed = true; // 🔥 blockiert Wiederholung
+
+            String decodedLetter = DecodeMorseCode(decoderString);
+            char buf[2] = { decodedLetter[0], '\0' };
+
+            if(actual_menu == MONITOR)
             {
-                char_on_screen = 0;
-                display.clear();
-            }
-            else char_on_screen++;
+                if(char_on_screen >= 90)
+                {
+                    char_on_screen = 0;
+                    display.clear();
+                }
+                else char_on_screen++;
 
-            int r, c;
-            CalcDisplayPosition(char_on_screen, &r, &c);
-            display.print(buf, r, c);
-        }
-        else if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN || actual_menu == TRAINER_GIVE_AZ_SCREEN)
-        {
-            if(buf[0] == currentTrainerLetter)
-            {
-                display.clear();
-                display.print("Correct !", 4,4);
+                int r, c;
+                CalcDisplayPosition(char_on_screen, &r, &c);
+                display.print(buf, r, c);
             }
-            else
+            else if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN || 
+                    actual_menu == TRAINER_GIVE_AZ_SCREEN)
             {
-                display.clear();
-                display.print("Not Correct !",4,2);
-                ProcessSign(currentTrainerLetter);
-            }
-            delay(1000);
-            if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
-              ShowTrainerGiveRandomScreen();
-            else
-              ShowTrainerGiveAZScreen();
-        }
-        else if(actual_menu == TRAINER_HEAR_SCREEN)
-        {
-          if(buf[0] == 'E' ||  buf[0] == 'T')
-        {
-          ShowTrainerHearScreen();
-        }
+                if(buf[0] == currentTrainerLetter)
+                {
+                    display.clear();
+                    display.print("Correct !", 4, 4);
+                }
+                else
+                {
+                    display.clear();
+                    display.print("Not Correct !", 4, 2);
+                    ProcessSign(currentTrainerLetter);
+                }
 
-        decoderString = ""; // Buffer leeren für das nächste Zeichen
-      }
-    }
+                delay(1000);
+
+                if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
+                    ShowTrainerGiveRandomScreen();
+                else
+                    ShowTrainerGiveAZScreen();
+            }
+            else if(actual_menu == TRAINER_HEAR_SCREEN)
+            {
+                if(buf[0] == 'E' || buf[0] == 'T')
+                {
+                    ShowTrainerHearScreen();
+                }
+            }
+
+            decoderString = ""; // 🔥 Buffer leeren für nächstes Zeichen
+        }
     }
 
     StateMachine(NO_KEY);
@@ -658,13 +671,13 @@ void ReactOnButtonClick()
       if(speakerOn == true)
       {
         SwitchSpeaker(false);
-        display.print("Speaker OFF", 1,4);
+        display.print("Speaker OFF", 2,4);
         DEBUG_PRINTLN("Speaker OFF");
       }
       else
       {
         SwitchSpeaker(true);
-        display.print("Speaker ON ", 1,4);
+        display.print("Speaker ON ", 2,4);
         DEBUG_PRINTLN("Speaker ON ");
       }
 

@@ -300,17 +300,9 @@ void OLED::init_OLED(void)
 
   clear_display();
   sendcommand(0x2e);            // stop scroll
-  //----------------------------REVERSE comments----------------------------//
-    sendcommand(0xa0);    //seg re-map 0->127(default)
-    sendcommand(0xa1);    //seg re-map 127->0
-    sendcommand(0xc8);
-    delay(1000);
-  //----------------------------REVERSE comments----------------------------//
-  // sendcommand(0xa7);  //Set Inverse Display  
-  // sendcommand(0xae);   //display off
+
   sendcommand(0x20);            //Set Memory Addressing Mode
-  sendcommand(0x00);            //Set Memory Addressing Mode ab Horizontal addressing mode
-  //  sendcommand(0x02);         // Set Memory Addressing Mode ab Page addressing mode(RESET)  
+  sendcommand(0x00);            //Set Memory Addressing Mode ab Horizontal addressing mode 
 }
 
 
