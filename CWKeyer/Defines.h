@@ -1,7 +1,7 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
-#define VERSION "0.44"
+#define VERSION "0.5"
 
 #define ROTARY_PIN1 2 //D4
 #define ROTARY_PIN2 0 //D3
@@ -45,6 +45,7 @@
 
 #define TRAINER_GIVE_RANDOM_SCREEN 10
 #define TRAINER_GIVE_AZ_SCREEN 11
+#define TRAINER_LISTEN_REPEAT_SCREEN 12
 #define TRAINER_HEAR_SCREEN 20
 ///////////////////////
 
@@ -65,11 +66,12 @@
 ///////////////////////
 
 // TRAINER MENU /////////
-#define TRAINER_MENU_COUNT 4
+#define TRAINER_MENU_COUNT 5
 #define TRAINER_HEAR 1
 #define TRAINER_GIVE_RANDOM 2
 #define TRAINER_GIVE_AZ 3
-#define TRAINER_BACK 4
+#define TRAINER_LISTEN_REPEAT 4
+#define TRAINER_BACK 5
 ///////////////////////
 
 // All morse characters

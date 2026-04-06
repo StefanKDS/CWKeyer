@@ -553,7 +553,8 @@ void loop()
     // Im Trainer-Modus: Vergleiche Eingabe mit erwartetem Buchstaben
     if(actual_menu == MONITOR || 
        actual_menu == TRAINER_GIVE_RANDOM_SCREEN || 
-       actual_menu == TRAINER_GIVE_AZ_SCREEN)
+       actual_menu == TRAINER_GIVE_AZ_SCREEN ||
+       actual_menu == TRAINER_LISTEN_REPEAT_SCREEN)
     {
         unsigned long now = millis();
 
@@ -588,7 +589,8 @@ void loop()
                 display.print(buf, r, c);
             }
             else if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN || 
-                    actual_menu == TRAINER_GIVE_AZ_SCREEN)
+                    actual_menu == TRAINER_GIVE_AZ_SCREEN ||
+                    actual_menu == TRAINER_LISTEN_REPEAT_SCREEN)
             {
                 if(buf[0] == currentTrainerLetter)
                 {
@@ -606,8 +608,10 @@ void loop()
 
                 if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
                     ShowTrainerGiveRandomScreen();
-                else
+                else if(actual_menu == TRAINER_GIVE_AZ_SCREEN)
                     ShowTrainerGiveAZScreen();
+                else if(actual_menu == TRAINER_LISTEN_REPEAT_SCREEN)
+                    ShowTrainerListenRepeatScreen();
             }
             else if(actual_menu == TRAINER_HEAR_SCREEN)
             {
@@ -772,6 +776,13 @@ void ReactOnButtonClick()
       return;
     }
 
+    if (selected_menu_item == TRAINER_LISTEN_REPEAT)
+    {
+      DEBUG_PRINTLN("Trainer Listen & Repeat");
+      ShowTrainerListenRepeatScreen();
+      return;
+    }
+
     if(selected_menu_item == TRAINER_BACK)
     {
       DEBUG_PRINTLN("Trainer Back");
@@ -787,6 +798,12 @@ void ReactOnButtonClick()
   }
 
   if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
+  {
+    ShowTrainerScreen();
+    return;
+  }
+
+  if(actual_menu == TRAINER_LISTEN_REPEAT_SCREEN)
   {
     ShowTrainerScreen();
     return;
@@ -1108,8 +1125,9 @@ void ShowTrainerScreen()
   display.print("Hear", 2,4);
   display.print("Give Random", 3,4);
   display.print("Give A-Z", 4,4);
+  display.print("Repeat", 5,4);
 
-  display.print("Back", 5,4);
+  display.print("Back", 6,4);
 
   display.print(">", 2,1);
 }
@@ -1142,6 +1160,38 @@ void ShowTrainerHearScreen()
   buf[5] = '\0';
   startPlayback(String(buf));
   display.print(buf, 4, 5);
+
+  decoderString = "";
+}
+
+/////////////////////////////////////////////////////////////////
+// ShowTrainerListenRepeatScreen
+/////////////////////////////////////////////////////////////////
+void ShowTrainerListenRepeatScreen()
+{
+  actual_menu = TRAINER_LISTEN_REPEAT_SCREEN;
+  selected_menu_item = 1;
+  display.clear();
+
+  // Zufälligen Buchstaben aus aktiver Liste wählen
+  if (selectedLetters.length() == 0) 
+  {
+    // Fallback: alle Buchstaben
+    selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  }
+  int idx = random(0, selectedLetters.length());
+  char letter = selectedLetters[idx];
+  currentTrainerLetter = letter;
+
+  char buf[2] = { currentTrainerLetter, '\0' };
+  display.print(buf, 4, 7);
+
+  startPlayback(String(buf));
+
+  DEBUG_PRINT("SelectedLetters: ");
+  DEBUG_PRINTLN(selectedLetters);
+  DEBUG_PRINT("CurrentTrainerLetter: ");
+  DEBUG_PRINTLN(currentTrainerLetter);
 
   decoderString = "";
 }
@@ -1411,7 +1461,7 @@ void rotate(Rotary& r)
     return;
   }  // ===== Menü-Navigation =====
   // Im Keyer-Menü nach oben/unten navigieren
-
+  if(actual_menu == CW_KEYER)
   {
     selected_menu_item++;  // Zum nächsten Menü-Element
 
