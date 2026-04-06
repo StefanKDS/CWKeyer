@@ -36,7 +36,7 @@ void updatePlayback();
 // Globale Objekte - Hardware-Schnittstellen
 /////////////////////////////////////////////////////////////////
 Rotary r;                               // Drehregler für Menünavigation und Geschwindigkeitsanpassung
-OLED display(SDA, SCL, 0x3c, 0);       // OLED-Display (I2C-Adresse 0x3c)
+OLED display(SDA, SCL, 0x3c, 2);       // OLED-Display (I2C-Adresse 0x3c)
 ESP8266WebServer server(80);            // Web-Server für WiFi-Konfiguration (Port 80)
 
 /////////////////////////////////////////////////////////////////

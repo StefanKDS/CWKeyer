@@ -265,10 +265,10 @@ void OLED::sendStrXY(const char *string, int X, int Y)
 // Inits oled and draws logo at startup
 void OLED::init_OLED(void)
 {
-  sendcommand(0xae);    //display off
-  sendcommand(0xa6);            //Set Normal Display (default)
+    sendcommand(0xae);            //display off
+    sendcommand(0xa6);            //Set Normal Display (default)
     // Adafruit Init sequence for 128x64 OLED module
-    sendcommand(0xAE);             //DISPLAYOFF
+    sendcommand(0xAE);            //DISPLAYOFF
     sendcommand(0xD5);            //SETDISPLAYCLOCKDIV
     sendcommand(0x80);            // the suggested ratio 0x80
     sendcommand(0xA8);            //SSD1306_SETMULTIPLEX
@@ -291,15 +291,15 @@ void OLED::init_OLED(void)
     sendcommand(0x12);           //COMSCANDEC
     sendcommand(0x81);           //SETCONTRAS
     sendcommand(0xCF);           //
-    sendcommand(0xd9);          //SETPRECHARGE 
+    sendcommand(0xd9);            //SETPRECHARGE 
     sendcommand(0xF1); 
-    sendcommand(0xDB);        //SETVCOMDETECT                
+    sendcommand(0xDB);            //SETVCOMDETECT                
     sendcommand(0x40);
-    sendcommand(0xA4);        //DISPLAYALLON_RESUME        
-    sendcommand(0xA6);        //NORMALDISPLAY             
+    sendcommand(0xA4);            //DISPLAYALLON_RESUME        
+    sendcommand(0xA6);          //NORMALDISPLAY             
 
-  clear_display();
-  sendcommand(0x2e);            // stop scroll
+    clear_display();
+    sendcommand(0x2e);            // stop scroll
 
   sendcommand(0x20);            //Set Memory Addressing Mode
   sendcommand(0x00);            //Set Memory Addressing Mode ab Horizontal addressing mode 
