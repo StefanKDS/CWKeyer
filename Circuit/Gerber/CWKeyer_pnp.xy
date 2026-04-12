@@ -4,7 +4,7 @@
 # eMail=
 #
 # Project=CWKeyer
-# Date=16:24:14
+# Date=12:56:05
 # CreatedBy=Fritzing 1.0.4.2024-10-07.CD-2088-0-a8c6ef7c
 #
 #
@@ -14,12 +14,16 @@
 #
 RefDes,Description,Package,X,Y,Rotation,Side,Mount
 Description: resistance;capacitance;inductance;voltage;current;power;mpn;mn;
-J1,";;;;;;;;","THT",1117.03,1192.73,180,Top,THT
-Buzz,";;;;;;;;","",3017.03,1142.73,0,Top,MANUAL
-Display,";;;;;;;;","THT",2067.03,292.727,90,Top,THT
-Encoder,";;;;;;;;","THT",3017.03,1492.73,0,Top,THT
-Speaker,";;;;;;;;","THT",3017.03,1892.73,0,Top,THT
-Battery,";;;;;;;;","THT",1467.03,292.727,-90,Top,THT
-Volume,";;;;;0.5W;;;","THT",2011.03,1892.73,0,Top,THT
-J2,";;;;;;;;","THT",217.027,1192.73,0,Top,THT
-Keyer,";;;;;;;;","THT",3017.03,892.727,0,Top,THT
+Enc,";;;;;;;;","THT",2958.26,1639.66,0,Top,THT
+Battery,";;;;;;;;","THT",1408.26,439.661,-90,Top,THT
+Display,";;;;;;;;","THT",2008.26,439.661,90,Top,THT
+J2,";;;;;;;;","THT",158.259,1339.66,0,Top,THT
+R1,"10k;;;;;0.25W;;;","THT",458.259,1839.66,-90,Top,THT
+Spk,";;;;;;;;","THT",2958.26,2039.66,0,Top,THT
+Volume,";;;;;0.5W;;;","THT",1952.26,2039.66,0,Top,THT
+C1,";100nF;;35V;;;;;","100 mil [THT, multilayer]",558.259,1989.48,-90,Top,THT
+Buzz,";;;;;;;;","",2958.26,1289.66,0,Top,MANUAL
+R2,"10k;;;;;0.25W;;;","THT",358.259,1839.66,90,Top,THT
+Key,";;;;;;;;","THT",2958.26,1039.66,0,Top,THT
+In,";;;;;;;;","THT",2958.26,789.661,0,Top,THT
+J1,";;;;;;;;","THT",1058.26,1339.66,180,Top,THT
