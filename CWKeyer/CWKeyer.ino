@@ -109,7 +109,7 @@ int State = STATE_IDLE;                  // Hauptzustand der Anwendung
 // ===== Goertzel Variablen =====
 const int audioInPin = A0;
 const float sampling_freq = 8928.0;
-const float target_freq = 558.0;
+const float target_freq = 700.0;  // Optimiert für CW-Audio (mindestens 700Hz nötig)
 const int decoder_n = 24;  // Samples pro Iteration
 
 float decoder_coeff;
@@ -265,23 +265,26 @@ void DecoderDetectMorse()
       decoder_startttimelow = now;
       decoder_highduration = now - decoder_starttimehigh;
 
-      // ===== Adaptive Timing für verschiedene WPM =====
-      if (decoder_highduration < (1.5 * decoder_hightimesavg) || decoder_hightimesavg == 0) 
-      {
-        decoder_hightimesavg = (decoder_highduration + decoder_hightimesavg + decoder_hightimesavg) / 3;
-      }
-
       // ===== Punkt oder Strich? =====
       if (decoder_highduration < (decoder_hightimesavg * 2)) 
       {
+        // Dit erkannt - lerne vom Dit
+        decoder_hightimesavg = (decoder_highduration + decoder_hightimesavg + decoder_hightimesavg) / 3;
         if (strlen(decoder_code) < sizeof(decoder_code) - 1) 
           strcat(decoder_code, ".");
       } 
       else 
       {
+        // Dah erkannt - extrapoliere Dit-Länge aus Dah (Dah = 3×Dit)
+        unsigned long dit_estimate = decoder_highduration / 3;
+        decoder_hightimesavg = (dit_estimate + decoder_hightimesavg + decoder_hightimesavg) / 3;
         if (strlen(decoder_code) < sizeof(decoder_code) - 1) 
           strcat(decoder_code, "-");
       }
+
+      Serial.println("decoder_hightimesavg: " + String(decoder_hightimesavg));
+      Serial.println("Duration: " + String(decoder_highduration));
+      Serial.println("Magnitude: " + String(decoder_magnitude) + " | Limit: " + String(decoder_magnitudelimit));
     }
 
     // ===== Übergang von LOW zu HIGH: Pause nach Ton =====
