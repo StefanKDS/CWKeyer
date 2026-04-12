@@ -8,7 +8,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
 <head>
-  <title>CWKeyer v0.4</title>
+  <title>CWKeyer v0.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
@@ -94,19 +94,19 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div class="container">
-    <h1>CWKeyer v0.4</h1>
+    <h1>CWKeyer v0.6</h1>
     <h2>Memory</h2>
-    <form action="/get">
+    <form action="/get" method="get">
       <label>Mem 1:
         <input type="text" name="input1" maxlength="128" value="%TEXT1%">
       </label>
-      <input type="submit" value="Save">
+      <input type="submit" value="Save 1">
     </form>
-    <form action="/get">
+    <form action="/get" method="get">
       <label>Mem 2:
         <input type="text" name="input2" maxlength="128" value="%TEXT2%">
       </label>
-      <input type="submit" value="Save">
+      <input type="submit" value="Save 2">
     </form>
     <h2>Trainer Letters</h2>
     <form action="/save_letters" method="get">
@@ -128,7 +128,7 @@ String wrapInPage(String content) {
 <!DOCTYPE HTML>
 <html>
 <head>
-  <title>CWKeyer v0.4</title>
+  <title>CWKeyer v0.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
@@ -166,7 +166,7 @@ String wrapInPage(String content) {
 </head>
 <body>
   <div class="container">
-    <h1>CWKeyer v0.4</h1>
+    <h1>CWKeyer v0.6</h1>
     %CONTENT%
     <br>
     <a href="/">Back</a>

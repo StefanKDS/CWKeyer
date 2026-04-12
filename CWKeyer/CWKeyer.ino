@@ -145,10 +145,6 @@ int decoder_stop = LOW;
 int decoder_sampleIndex = 0;
 bool decoder_readyToProcess = false;
 
-// ===== Display Counter für Monitor-Modus =====
-int decoder_char_count = 0;
-
-
 /////////////////////////////////////////////////////////////////
 /// DecoderInit() - Initialisiert Dekoder beim Setup
 /////////////////////////////////////////////////////////////////
@@ -1595,7 +1591,7 @@ void ShowMonitorScreen()
 {
   actual_menu = MONITOR;
   selected_menu_item = 1;
-  decoder_char_count = 0;  // Reset Display-Counter für ALLE Zeichen (Audio + Keyer)
+  char_on_screen = 0;
   display.clear();
 
   // WICHTIG: Deaktiviere Webserver für optimale Timing
@@ -1739,6 +1735,8 @@ void rotate(Rotary& r)
       }
     }
 
+    fwpm = wpm;
+
     // Aktualisiere Display mit neuer WPM
     char string[20];
     snprintf(string, sizeof(string), "Speed: %i WPM", wpm);
@@ -1777,10 +1775,19 @@ void rotate(Rotary& r)
   // Im Keyer-Menü nach oben/unten navigieren
   if(actual_menu == CW_KEYER)
   {
-    selected_menu_item++;  // Zum nächsten Menü-Element
+    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
+    {
+      selected_menu_item++;  // Zum nächsten Menü-Element
 
-    if(selected_menu_item > KEYER_MENU_COUNT)  // Zyklisch: Wenn am Ende, gehe zum Anfang
-      selected_menu_item = 1;
+      if(selected_menu_item > KEYER_MENU_COUNT)  // Zyklisch: Wenn am Ende, gehe zum Anfang
+        selected_menu_item = 1;
+    }
+    else                         // Drehung links = Menü nach oben
+    {
+      selected_menu_item--;
+      if(selected_menu_item < 1)
+        selected_menu_item = KEYER_MENU_COUNT;  // Zyklisch
+    }
 
     DisplaySelectionArrow();  // Zeige neue Position an
     return;
@@ -1811,10 +1818,19 @@ void rotate(Rotary& r)
   // Im Setup-Menü navigieren
   if(actual_menu == SETUP)
   {
-    selected_menu_item++;
+    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
+    {
+      selected_menu_item++;
 
-    if(selected_menu_item > SETUP_MENU_COUNT)
-      selected_menu_item = 1;
+      if(selected_menu_item > SETUP_MENU_COUNT)
+        selected_menu_item = 1;
+    }
+    else                         // Drehung links = Menü nach oben
+    {
+      selected_menu_item--;
+      if(selected_menu_item < 1)
+        selected_menu_item = SETUP_MENU_COUNT;  // Zyklisch
+    }
 
     DisplaySelectionArrow();
 
@@ -1824,10 +1840,19 @@ void rotate(Rotary& r)
   // Im Trainer-Menü navigieren
   if(actual_menu == TRAINER)
   {
-    selected_menu_item++;
+    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
+    {
+      selected_menu_item++;
 
-    if(selected_menu_item > TRAINER_MENU_COUNT)
-      selected_menu_item = 1;
+      if(selected_menu_item > TRAINER_MENU_COUNT)
+        selected_menu_item = 1;
+    }
+    else                         // Drehung links = Menü nach oben
+    {
+      selected_menu_item--;
+      if(selected_menu_item < 1)
+        selected_menu_item = TRAINER_MENU_COUNT;  // Zyklisch
+    }
 
     DisplaySelectionArrow();
 
