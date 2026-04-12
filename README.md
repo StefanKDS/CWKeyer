@@ -9,11 +9,12 @@ Address:  192.168.4.2
 
 # Features
 
-- Adjustable speed in WPM
+- Adjustable speed in WPM and Farnsworth
 - Internal buzzer for sound output ( can be deactivated in software )
 - LineOut
 - 2 Memories for 128 char's each
 - WebInterface for setting the memory and training data
+- CW Audio decoder
 
 # Images
 
