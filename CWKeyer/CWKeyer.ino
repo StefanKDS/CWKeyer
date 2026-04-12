@@ -82,7 +82,7 @@ bool fspeed_mode = false;       // true = Encoder zum Ändern der Farnsworth-Ges
 bool speakerOn = true;          // true = Buzzer ist aktiviert
 bool settingsOn = false;        // true = WiFi/Web-Server ist aktiviert
 double key_activated;           // Zeitstempel der letzten Tastatureingabe
-short char_on_screen = -1;      // Nummer des Zeichens auf dem Monitor-Bildschirm
+short char_on_screen = -1;
 
 // ===== Menü-Navigation =====
 byte selected_menu_item = SETUP_SPEAKER;  // Der aktuell ausgewählte Menüpunkt
@@ -282,9 +282,9 @@ void DecoderDetectMorse()
           strcat(decoder_code, "-");
       }
 
-      Serial.println("decoder_hightimesavg: " + String(decoder_hightimesavg));
-      Serial.println("Duration: " + String(decoder_highduration));
-      Serial.println("Magnitude: " + String(decoder_magnitude) + " | Limit: " + String(decoder_magnitudelimit));
+      //Serial.println("decoder_hightimesavg: " + String(decoder_hightimesavg));
+      //Serial.println("Duration: " + String(decoder_highduration));
+      //Serial.println("Magnitude: " + String(decoder_magnitude) + " | Limit: " + String(decoder_magnitudelimit));
     }
 
     // ===== Übergang von LOW zu HIGH: Pause nach Ton =====
@@ -384,15 +384,15 @@ void DecoderDecodeMorse()
     // Zeige Zeichen auf Monitor-Display
     if (actual_menu == MONITOR)
     {
-      if(decoder_char_count >= 90)
+      if(char_on_screen >= 90)
       {
-        decoder_char_count = 0;
+        char_on_screen = 0;
         display.clear();
       }
-      else decoder_char_count++;
+      else char_on_screen++;
 
       int r, c_col;
-      CalcDisplayPosition(decoder_char_count, &r, &c_col);
+      CalcDisplayPosition(char_on_screen, &r, &c_col);
       char buf[2] = {c, '\0'};
       display.print(buf, r, c_col);
     }
@@ -1595,11 +1595,8 @@ void ShowMonitorScreen()
 {
   actual_menu = MONITOR;
   selected_menu_item = 1;
-  char_on_screen = 0;
-  decoder_char_count = 0;  // Reset Dekoder-Display-Counter
+  decoder_char_count = 0;  // Reset Display-Counter für ALLE Zeichen (Audio + Keyer)
   display.clear();
-  display.print("Monitor Mode", 0, 2);
-  display.print("Listening...", 2, 3);
 
   // WICHTIG: Deaktiviere Webserver für optimale Timing
   if(settingsOn == true)
