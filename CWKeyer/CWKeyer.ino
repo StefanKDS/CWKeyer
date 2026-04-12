@@ -104,6 +104,299 @@ short currentAZPosition = -1;             // Position in Alphabet für sequenzie
 int State = STATE_IDLE;                  // Hauptzustand der Anwendung
 
 /////////////////////////////////////////////////////////////////
+// Audio Decoder - Goertzel Algorithm für Morse-Audio-Eingang
+/////////////////////////////////////////////////////////////////
+// ===== Goertzel Variablen =====
+const int audioInPin = A0;
+const float sampling_freq = 8928.0;
+const float target_freq = 558.0;
+const int decoder_n = 24;  // Samples pro Iteration
+
+float decoder_coeff;
+float decoder_Q1 = 0;
+float decoder_Q2 = 0;
+int decoder_testData[24];
+
+// ===== State Tracking =====
+int decoder_realstate = LOW;
+int decoder_realstatebefore = LOW;
+int decoder_filteredstate = LOW;
+int decoder_filteredstatebefore = LOW;
+
+// ===== Magnitude Tracking =====
+float decoder_magnitude;
+int decoder_magnitudelimit = 100;
+const int decoder_magnitudelimit_low = 100;
+
+// ===== Timing Variables =====
+const int decoder_nbtime = 200;  // Debounce in Mikrosekunden
+unsigned long decoder_starttimehigh;
+unsigned long decoder_highduration;
+unsigned long decoder_hightimesavg = 100000;  // Initial ~60ms für 20 WPM
+unsigned long decoder_startttimelow;
+unsigned long decoder_lowduration;
+unsigned long decoder_laststarttime = 0;
+
+// ===== Morse Code Buffer =====
+char decoder_code[20] = "";
+int decoder_stop = LOW;
+
+// ===== Sampling State Machine =====
+int decoder_sampleIndex = 0;
+bool decoder_readyToProcess = false;
+
+// ===== Display Counter für Monitor-Modus =====
+int decoder_char_count = 0;
+
+
+/////////////////////////////////////////////////////////////////
+/// DecoderInit() - Initialisiert Dekoder beim Setup
+/////////////////////////////////////////////////////////////////
+void DecoderInit()
+{
+  // Berechne Goertzel-Koeffizient
+  int k = (int)(0.5 + ((decoder_n * target_freq) / sampling_freq));
+  float omega = (2.0 * PI * k) / decoder_n;
+  decoder_coeff = 2.0 * cos(omega);
+
+  DEBUG_PRINTLN("Audio Decoder initialized");
+}
+
+/////////////////////////////////////////////////////////////////
+/// DecoderUpdate() - Non-blocking Dekoder Update
+// Rufe dies in jedem Loop auf wenn actual_menu == MONITOR
+/////////////////////////////////////////////////////////////////
+void DecoderUpdate()
+{
+  // ===== Sampling Phase: Sammle Samples nicht-blockierend =====
+  if (decoder_sampleIndex < decoder_n) 
+  {
+    decoder_testData[decoder_sampleIndex] = analogRead(audioInPin);
+    decoder_sampleIndex++;
+
+    if (decoder_sampleIndex >= decoder_n) 
+    {
+      decoder_readyToProcess = true;
+    }
+    return;  // Kurz raus aus dieser Iteration
+  }
+
+  // ===== Processing Phase: Verarbeite gesammelte Samples =====
+  if (decoder_readyToProcess)
+  {
+    DecoderProcessGoertzel();
+    DecoderUpdateStateLogic();
+    DecoderDetectMorse();
+
+    decoder_sampleIndex = 0;
+    decoder_readyToProcess = false;
+  }
+}
+
+/////////////////////////////////////////////////////////////////
+/// DecoderProcessGoertzel() - Goertzel-Algorithmus
+/////////////////////////////////////////////////////////////////
+void DecoderProcessGoertzel()
+{
+  // ===== Goertzel DFT Berechnung =====
+  for (int i = 0; i < decoder_n; i++) 
+  {
+    float Q0 = decoder_coeff * decoder_Q1 - decoder_Q2 + (float)decoder_testData[i];
+    decoder_Q2 = decoder_Q1;
+    decoder_Q1 = Q0;
+  }
+
+  // ===== Magnitude berechnen =====
+  float magnitudeSquared = (decoder_Q1 * decoder_Q1) + (decoder_Q2 * decoder_Q2) - decoder_Q1 * decoder_Q2 * decoder_coeff;
+  decoder_magnitude = sqrt(magnitudeSquared);
+
+  // Reset für nächste Iteration
+  decoder_Q1 = 0;
+  decoder_Q2 = 0;
+
+  // ===== Adaptive Magnitude-Limit (WICHTIG für verschiedene Geschwindigkeiten) =====
+  if (decoder_magnitude > decoder_magnitudelimit_low) 
+  {
+    decoder_magnitudelimit += (decoder_magnitude - decoder_magnitudelimit) / 6;
+  }
+
+  if (decoder_magnitudelimit < decoder_magnitudelimit_low)
+    decoder_magnitudelimit = decoder_magnitudelimit_low;
+}
+
+/////////////////////////////////////////////////////////////////
+/// DecoderUpdateStateLogic() - Hysterese und Debouncing
+/////////////////////////////////////////////////////////////////
+void DecoderUpdateStateLogic()
+{
+  unsigned long now = micros();
+
+  // ===== Signal-Schwelle mit Hysterese =====
+  if (decoder_magnitude > decoder_magnitudelimit * 0.6)
+    decoder_realstate = HIGH;
+  else
+    decoder_realstate = LOW;
+
+  // ===== State-Änderung erkennen =====
+  if (decoder_realstate != decoder_realstatebefore)
+    decoder_laststarttime = now;
+
+  // ===== Debouncing: Nur bei stabiler State-Änderung aktualisieren =====
+  if ((now - decoder_laststarttime) > decoder_nbtime)
+    decoder_filteredstate = decoder_realstate;
+
+  decoder_realstatebefore = decoder_realstate;
+}
+
+/////////////////////////////////////////////////////////////////
+/// DecoderDetectMorse() - Morse-Erkennung
+/////////////////////////////////////////////////////////////////
+void DecoderDetectMorse()
+{
+  unsigned long now = micros();
+
+  if (decoder_filteredstate != decoder_filteredstatebefore) 
+  {
+    decoder_stop = LOW;
+
+    // ===== Übergang von HIGH zu LOW: Ton endete =====
+    if (decoder_filteredstate == LOW) 
+    {
+      decoder_startttimelow = now;
+      decoder_highduration = now - decoder_starttimehigh;
+
+      // ===== Adaptive Timing für verschiedene WPM =====
+      if (decoder_highduration < (1.5 * decoder_hightimesavg) || decoder_hightimesavg == 0) 
+      {
+        decoder_hightimesavg = (decoder_highduration + decoder_hightimesavg + decoder_hightimesavg) / 3;
+      }
+
+      // ===== Punkt oder Strich? =====
+      if (decoder_highduration < (decoder_hightimesavg * 2)) 
+      {
+        if (strlen(decoder_code) < sizeof(decoder_code) - 1) 
+          strcat(decoder_code, ".");
+      } 
+      else 
+      {
+        if (strlen(decoder_code) < sizeof(decoder_code) - 1) 
+          strcat(decoder_code, "-");
+      }
+    }
+
+    // ===== Übergang von LOW zu HIGH: Pause nach Ton =====
+    if (decoder_filteredstate == HIGH) 
+    {
+      decoder_starttimehigh = now;
+      decoder_lowduration = now - decoder_startttimelow;
+
+      // ===== Lange Pause = Zeichentrennung =====
+      if (decoder_lowduration > decoder_hightimesavg * 2) 
+      {
+        DecoderDecodeMorse();
+        decoder_code[0] = '\0';
+      }
+    }
+  }
+
+  // ===== Timeout: Sehr lange Pause = Wortende =====
+  if ((now - decoder_startttimelow) > (decoder_highduration * 6) && decoder_stop == LOW) 
+  {
+    DecoderDecodeMorse();
+    decoder_code[0] = '\0';
+    decoder_stop = HIGH;
+  }
+
+  decoder_filteredstatebefore = decoder_filteredstate;
+}
+
+/////////////////////////////////////////////////////////////////
+/// DecoderDecodeMorse() - Morse-Code zu ASCII decodieren
+/////////////////////////////////////////////////////////////////
+void DecoderDecodeMorse()
+{
+  if (strlen(decoder_code) == 0) return;
+
+  char c = ' ';
+
+  // ===== Buchstaben (A-Z) =====
+  if (strcmp(decoder_code, ".-") == 0) c = 'A';
+  else if (strcmp(decoder_code, "-...") == 0) c = 'B';
+  else if (strcmp(decoder_code, "-.-.") == 0) c = 'C';
+  else if (strcmp(decoder_code, "-..") == 0) c = 'D';
+  else if (strcmp(decoder_code, ".") == 0) c = 'E';
+  else if (strcmp(decoder_code, "..-.") == 0) c = 'F';
+  else if (strcmp(decoder_code, "--.") == 0) c = 'G';
+  else if (strcmp(decoder_code, "....") == 0) c = 'H';
+  else if (strcmp(decoder_code, "..") == 0) c = 'I';
+  else if (strcmp(decoder_code, ".---") == 0) c = 'J';
+  else if (strcmp(decoder_code, "-.-") == 0) c = 'K';
+  else if (strcmp(decoder_code, ".-..") == 0) c = 'L';
+  else if (strcmp(decoder_code, "--") == 0) c = 'M';
+  else if (strcmp(decoder_code, "-.") == 0) c = 'N';
+  else if (strcmp(decoder_code, "---") == 0) c = 'O';
+  else if (strcmp(decoder_code, ".--.") == 0) c = 'P';
+  else if (strcmp(decoder_code, "--.-") == 0) c = 'Q';
+  else if (strcmp(decoder_code, ".-.") == 0) c = 'R';
+  else if (strcmp(decoder_code, "...") == 0) c = 'S';
+  else if (strcmp(decoder_code, "-") == 0) c = 'T';
+  else if (strcmp(decoder_code, "..-") == 0) c = 'U';
+  else if (strcmp(decoder_code, "...-") == 0) c = 'V';
+  else if (strcmp(decoder_code, ".--") == 0) c = 'W';
+  else if (strcmp(decoder_code, "-..-") == 0) c = 'X';
+  else if (strcmp(decoder_code, "-.--") == 0) c = 'Y';
+  else if (strcmp(decoder_code, "--..") == 0) c = 'Z';
+  // ===== Zahlen (0-9) =====
+  else if (strcmp(decoder_code, "-----") == 0) c = '0';
+  else if (strcmp(decoder_code, ".----") == 0) c = '1';
+  else if (strcmp(decoder_code, "..---") == 0) c = '2';
+  else if (strcmp(decoder_code, "...--") == 0) c = '3';
+  else if (strcmp(decoder_code, "....-") == 0) c = '4';
+  else if (strcmp(decoder_code, ".....") == 0) c = '5';
+  else if (strcmp(decoder_code, "-....") == 0) c = '6';
+  else if (strcmp(decoder_code, "--...") == 0) c = '7';
+  else if (strcmp(decoder_code, "---..") == 0) c = '8';
+  else if (strcmp(decoder_code, "----.") == 0) c = '9';
+  // ===== Sonderzeichen =====
+  else if (strcmp(decoder_code, "..--..") == 0) c = '?';
+  else if (strcmp(decoder_code, ".-.-.-") == 0) c = '.';
+  else if (strcmp(decoder_code, "--..--") == 0) c = ',';
+  else if (strcmp(decoder_code, "-.-.--") == 0) c = '!';
+  else if (strcmp(decoder_code, ".--.-.") == 0) c = '@';
+  else if (strcmp(decoder_code, "---...") == 0) c = ':';
+  else if (strcmp(decoder_code, "-....-") == 0) c = '-';
+  else if (strcmp(decoder_code, "-..-.") == 0) c = '/';
+  else if (strcmp(decoder_code, "-.--.") == 0) c = '(';
+  else if (strcmp(decoder_code, "-.--.-") == 0) c = ')';
+  else if (strcmp(decoder_code, ".-...") == 0) c = '&';
+  else if (strcmp(decoder_code, "...-..-") == 0) c = '$';
+  else if (strcmp(decoder_code, ".-.-.") == 0) c = '+';
+  else if (strcmp(decoder_code, "-...-") == 0) c = '=';
+
+  // ===== Zeichen anzeigen und weitergeben =====
+  if (c != ' ') 
+  {
+    Serial.print(c);  // Debug-Ausgabe
+
+    // Zeige Zeichen auf Monitor-Display
+    if (actual_menu == MONITOR)
+    {
+      if(decoder_char_count >= 90)
+      {
+        decoder_char_count = 0;
+        display.clear();
+      }
+      else decoder_char_count++;
+
+      int r, c_col;
+      CalcDisplayPosition(decoder_char_count, &r, &c_col);
+      char buf[2] = {c, '\0'};
+      display.print(buf, r, c_col);
+    }
+  }
+}
+
+/////////////////////////////////////////////////////////////////
 // notFound
 /////////////////////////////////////////////////////////////////
 void notFound() 
@@ -310,6 +603,10 @@ void setup()
 
   // ===== Speaker-Pin Initialisierung =====
   pinMode(SPEAKER_PIN, OUTPUT);  // Für Ton-Ausgabe (Frequenz mit tone())
+
+  // ===== Audio Decoder Initialisierung =====
+  DEBUG_PRINTLN("- AUDIO DECODER INIT -");
+  DecoderInit();
 }
 
 /////////////////////////////////////////////////////////////////
@@ -458,11 +755,18 @@ void loop()
     // die Pause nach einem Zeichen abgelaufen ist
     static bool letterProcessed = false;
 
-    if (settingsOn) 
+    // ===== Audio Dekoder - ZEITKRITISCH =====
+    // Wird MIT HOHER PRIORITÄT aufgerufen, bevor Server/UI verarbeitet werden
+    if (actual_menu == MONITOR)
+    {
+      DecoderUpdate();  // Non-blocking Audio-Dekodierung
+    }
+
+    if (settingsOn && actual_menu != MONITOR) 
     {
         server.handleClient();
     }
-    
+
     r.loop();
 
     // Encoder Button
@@ -1289,7 +1593,17 @@ void ShowMonitorScreen()
   actual_menu = MONITOR;
   selected_menu_item = 1;
   char_on_screen = 0;
+  decoder_char_count = 0;  // Reset Dekoder-Display-Counter
   display.clear();
+  display.print("Monitor Mode", 0, 2);
+  display.print("Listening...", 2, 3);
+
+  // WICHTIG: Deaktiviere Webserver für optimale Timing
+  if(settingsOn == true)
+  {
+    DEBUG_PRINTLN("Disabling WiFi for Monitor Mode");
+    SwitchSettings(0);
+  }
 }
 
 /////////////////////////////////////////////////////////////////
