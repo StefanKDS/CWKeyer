@@ -14,7 +14,7 @@ Address:  192.168.4.2
 - LineOut
 - 2 Memories for 128 char's each
 - WebInterface for setting the memory and training data
-- CW Audio decoder
+- CW Audio decoder ( Under 'Docs' you can find a 'How it works' )
 
 # Images
 
