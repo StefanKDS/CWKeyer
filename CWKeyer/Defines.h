@@ -1,7 +1,7 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
-#define VERSION "0.64"
+#define VERSION "0.65"
 
 #define ROTARY_PIN1 2 //D4
 #define ROTARY_PIN2 0 //D3

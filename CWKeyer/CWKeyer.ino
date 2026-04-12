@@ -9,148 +9,147 @@
 #include "Defines.h"
 
 /////////////////////////////////////////////////////////////////
-// DEKLARATIONEN - Funktionsprototypen
-// Diese Prototypen ermöglichen, dass Funktionen vor ihrer Definition
-// aufgerufen werden können
+// DECLARATIONS - Function Prototypes
+// These prototypes allow functions to be called before their
+// definition in the code
 /////////////////////////////////////////////////////////////////
 
-void CalculateTimes(char wpm, char fwpm);  // Berechnet Timings basierend auf WPM-Wert
-String ReadTextFromEEPROM(byte addr);
-void SwitchSpeaker(byte value);
-void WriteTextToEEPROM(byte addr, String text);
-void ShowMainScreen();
-void ShowSetupScreen(); 
-void ShowMonitorScreen();
-void ShowTrainerScreen();
-void ShowKeyerScreen();
-void rotate(Rotary& r);
-void ReactOnButtonClick();
-void ProcessBeep(short beepoLength, char outputChar);
-void ProcessSign(char sign);
-void startBeep(unsigned int length, char symbol);
-void updateBeep();
-void startPlayback(String text);
-void updatePlayback();
+void CalculateTimes(char wpm, char fwpm);  // Calculate timing values based on WPM
+String ReadTextFromEEPROM(byte addr);      // Read string from EEPROM at specified address
+void SwitchSpeaker(byte value);            // Enable/disable buzzer output
+void WriteTextToEEPROM(byte addr, String text);  // Write string to EEPROM at specified address
+void ShowMainScreen();                     // Display main menu screen
+void ShowSetupScreen();                    // Display setup/configuration screen
+void ShowMonitorScreen();                  // Display Morse monitor (decoder) screen
+void ShowTrainerScreen();                  // Display trainer mode menu
+void ShowKeyerScreen();                    // Display CW keyer menu
+void rotate(Rotary& r);                    // Handle rotary encoder rotation
+void ReactOnButtonClick();                 // Handle mode button click
+void ProcessBeep(short beepoLength, char outputChar);  // Start a beep tone
+void ProcessSign(char sign);               // Play a single character as Morse code
+void startBeep(unsigned int length, char symbol);     // Start non-blocking beep
+void updateBeep();                         // Update beep state (non-blocking)
+void startPlayback(String text);           // Start playback of stored text
+void updatePlayback();                     // Update playback state (non-blocking)
 
 /////////////////////////////////////////////////////////////////
-// Globale Objekte - Hardware-Schnittstellen
+// GLOBAL OBJECTS - Hardware Interfaces
 /////////////////////////////////////////////////////////////////
-Rotary r;                               // Drehregler für Menünavigation und Geschwindigkeitsanpassung
-OLED display(SDA, SCL, 0x3c, 2);       // OLED-Display (I2C-Adresse 0x3c)
-ESP8266WebServer server(80);            // Web-Server für WiFi-Konfiguration (Port 80)
+Rotary r;                               // Rotary encoder for menu navigation and speed adjustment
+OLED display(SDA, SCL, 0x3c, 2);       // OLED display (I2C address 0x3c)
+ESP8266WebServer server(80);            // Web server for WiFi configuration (Port 80)
 
 /////////////////////////////////////////////////////////////////
-// Globale Variablen - Zustand und Timing
+// GLOBAL VARIABLES - State and Timing
 /////////////////////////////////////////////////////////////////
 
 // ===== Non-blocking Beep / Playback State =====
-// Der Ton wird nicht blockierend abgespielt; diese Variablen verwalten seinen Status
-bool beeping = false;           // true, während der Ton aktiv ist
-unsigned long beepEnd = 0;      // Zeitpunkt, an dem der aktuelle Ton endet
+// Audio tone playback is non-blocking; these variables manage its state
+bool beeping = false;           // true while tone is currently active
+unsigned long beepEnd = 0;      // Timestamp when current tone ends (milliseconds)
 
-bool inPause = false;           // true, während eine Pause zwischen Elementen läuft
-unsigned long pauseEnd = 0;     // Zeitpunkt, an dem die aktuelle Pause endet
+bool inPause = false;           // true while a pause between elements is running
+unsigned long pauseEnd = 0;     // Timestamp when current pause ends (milliseconds)
 
-// ===== Timing-Steuerung für Zeichenerkennung =====
-unsigned long lastKeyTime = 0; // Zeit der letzten Tastatureingabe (zur Erkennung von Zeichenenden)
-unsigned int letterGap = 3;    // Pauenabstand zwischen Buchstaben (3T)
+// ===== Timing Control for Character Recognition =====
+unsigned long lastKeyTime = 0;  // Timestamp of last key input (for character end detection)
+unsigned int letterGap = 3;     // Pause gap between characters (3T units)
 
+// ===== Playback State - For Stored Text Playback =====
+bool playing = false;           // true while text is being played back
+String playbackText = "";       // Text to be played
+int playbackIndex = 0;          // Current position in playbackText
+String currentMorse = "";       // Morse code of current character (e.g. ".-")
+int morseIndex = 0;             // Current position in Morse code (which dot/dash)
+unsigned long nextActionTime = 0; // Timestamp of next action during playback
 
-// ===== Playback State - für gespeicherte Text-Wiedergabe =====
-bool playing = false;           // true, während Text wiedergegeben wird
-String playbackText = "";       // Der zu playenden Text
-int playbackIndex = 0;          // Aktuelle Position im playbackText
-String currentMorse = "";       // Morse-Code des aktuellen Zeichens (z.B. ".-")
-int morseIndex = 0;             // Aktuelle Position im Morse-Code (welcher Punkt/Strich)
-unsigned long nextActionTime = 0; // Zeitpunkt der nächsten Aktion beim Playback
+// ===== Morse Code Timing (T-based) =====
+// T is the basic time unit: T = 1200ms / WPM
+// With Farnsworth, pauses are extended, but dots/dashes remain the same
+unsigned int T_unit = 0;        // Basic time unit in milliseconds
+unsigned int dit_len = 0;       // Duration of a dot (1T)
+unsigned int dah_len = 0;       // Duration of a dash (3T)
+unsigned int elementGap = 0;    // Pause between dot/dash (1T - Inter-Element Gap)
+unsigned int letterExtra = 0;   // Extra pause after letter (Farnsworth adjustment)
+unsigned int wordExtra = 0;     // Extra pause after word (Farnsworth adjustment)
 
-// ===== Morse-Code Timing (T-basiert) =====
-// T ist die Basis-Zeiteinheit: T = 1200ms / WPM
-// Mit Farnsworth werden Pausen verlängert, aber Punkt/Strich bleiben gleich
-unsigned int T_unit = 0;        // Basis-Zeiteinheit in Millisekunden
-unsigned int dit_len = 0;       // Länge eines Punktes (1T)
-unsigned int dah_len = 0;       // Länge eines Strichs (3T)
-unsigned int elementGap = 0;    // Pause zwischen Punkt/Strich (1T - Inter-Element Gap)
-unsigned int letterExtra = 0;   // Zusätzliche Pause nach Buchstabe (Farnsworth-Anpassung)
-unsigned int wordExtra = 0;     // Zusätzliche Pause nach Wort (Farnsworth-Anpassung)
+// ===== User Configuration and Modes =====
+char wpm = START_POS;           // Speed in words per minute (WPM)
+char fwpm = wpm;                // Farnsworth speed (for extended pauses)
+bool speed_mode = false;        // true = Encoder for changing WPM speed
+bool fspeed_mode = false;       // true = Encoder for changing Farnsworth speed
+bool speakerOn = true;          // true = Buzzer is enabled
+bool settingsOn = false;        // true = WiFi/Web-Server is enabled
+double key_activated;           // Timestamp of last key press
+short char_on_screen = -1;      // Number of characters displayed on screen
 
-// ===== Benutzer-Konfiguration und Modi =====
-char wpm = START_POS;           // Geschwindigkeit in Wörter pro Minute (WPM)
-char fwpm = wpm;                // Farnsworth-Geschwindigkeit (für längere Pausen)
-bool speed_mode = false;        // true = Encoder zum Ändern der WPM-Geschwindigkeit
-bool fspeed_mode = false;       // true = Encoder zum Ändern der Farnsworth-Geschwindigkeit
-bool speakerOn = true;          // true = Buzzer ist aktiviert
-bool settingsOn = false;        // true = WiFi/Web-Server ist aktiviert
-double key_activated;           // Zeitstempel der letzten Tastatureingabe
-short char_on_screen = -1;
+// ===== Menu Navigation =====
+byte selected_menu_item = SETUP_SPEAKER;  // Currently selected menu item
+byte actual_menu = MAIN_MENU;             // Current screen/menu being displayed
 
-// ===== Menü-Navigation =====
-byte selected_menu_item = SETUP_SPEAKER;  // Der aktuell ausgewählte Menüpunkt
-byte actual_menu = MAIN_MENU;             // Der aktuelle Bildschirm/Menü
+// ===== WiFi and Web Server =====
+const char* ssid     = "CWKeyer";        // WiFi network name of the access point
+const char* password = "123456789";      // WiFi password
+const char* TEXT_1 = "input1";           // Parameter name for web form (memory 1)
+const char* TEXT_2 = "input2";           // Parameter name for web form (memory 2)
 
-// ===== WiFi und Web-Server =====
-const char* ssid     = "CWKeyer";        // WiFi-Netzwerkname des Access Points
-const char* password = "123456789";      // WiFi-Passwort
-const char* TEXT_1 = "input1";           // Parameter-Namen für Web-Formulare
-const char* TEXT_2 = "input2";
+// ===== Morse Code Decoding and Trainer =====
+String decoderString;                    // Buffers received dots/dashes (e.g. ".-")
+String selectedLetters = "";             // Letters for trainer (e.g. "ABC...XYZ")
+char currentTrainerLetter;                // Current letter to train
+short currentAZPosition = -1;             // Position in alphabet for sequential training
 
-// ===== Morse-Code Dekodierung und Trainer =====
-String decoderString;                    // Buffert die empfangenen Punkt/Strich (z.B. ".-")
-String selectedLetters = "";             // Buchstaben für Trainer (z.B. "ABC...XYZ")
-char currentTrainerLetter;                // Der zu trainieren Buchstabe
-short currentAZPosition = -1;             // Position in Alphabet für sequenzielles Training
-
-// ===== Zustandsverwaltung =====
-int State = STATE_IDLE;                  // Hauptzustand der Anwendung
+// ===== State Management =====
+int State = STATE_IDLE;                  // Main application state
 
 /////////////////////////////////////////////////////////////////
-// Audio Decoder - Goertzel Algorithm für Morse-Audio-Eingang
+// Audio Decoder - Goertzel Algorithm for Morse Audio Input
 /////////////////////////////////////////////////////////////////
-// ===== Goertzel Variablen =====
-const int audioInPin = A0;
-const float sampling_freq = 8928.0;
-const float target_freq = 700.0;  // Optimiert für CW-Audio (mindestens 700Hz nötig)
-const int decoder_n = 24;  // Samples pro Iteration
+// ===== Goertzel Variables =====
+const int audioInPin = A0;                // Analog input pin for audio decoder
+const float sampling_freq = 8928.0;       // Sampling frequency for Goertzel algorithm
+const float target_freq = 700.0;          // Target frequency (optimized for CW audio, minimum 700Hz required)
+const int decoder_n = 24;                 // Number of samples per Goertzel iteration
 
-float decoder_coeff;
-float decoder_Q1 = 0;
-float decoder_Q2 = 0;
-int decoder_testData[24];
+float decoder_coeff;                      // Goertzel coefficient (precomputed)
+float decoder_Q1 = 0;                     // Goertzel Q1 state variable
+float decoder_Q2 = 0;                     // Goertzel Q2 state variable
+int decoder_testData[24];                 // Buffer for audio samples
 
 // ===== State Tracking =====
-int decoder_realstate = LOW;
-int decoder_realstatebefore = LOW;
-int decoder_filteredstate = LOW;
-int decoder_filteredstatebefore = LOW;
+int decoder_realstate = LOW;              // Current audio state (raw)
+int decoder_realstatebefore = LOW;        // Previous raw state
+int decoder_filteredstate = LOW;          // Debounced audio state
+int decoder_filteredstatebefore = LOW;    // Previous debounced state
 
 // ===== Magnitude Tracking =====
-float decoder_magnitude;
-int decoder_magnitudelimit = 100;
-const int decoder_magnitudelimit_low = 100;
+float decoder_magnitude;                  // Magnitude of Goertzel output
+int decoder_magnitudelimit = 100;         // Adaptive threshold for signal detection
+const int decoder_magnitudelimit_low = 100;  // Minimum threshold
 
 // ===== Timing Variables =====
-const int decoder_nbtime = 200;  // Debounce in Mikrosekunden
-unsigned long decoder_starttimehigh;
-unsigned long decoder_highduration;
-unsigned long decoder_hightimesavg = 100000;  // Initial ~60ms für 20 WPM
-unsigned long decoder_startttimelow;
-unsigned long decoder_lowduration;
-unsigned long decoder_laststarttime = 0;
+const int decoder_nbtime = 200;           // Debounce time in microseconds
+unsigned long decoder_starttimehigh;      // When HIGH state started
+unsigned long decoder_highduration;       // Duration of HIGH state (tone)
+unsigned long decoder_hightimesavg = 100000;  // Average HIGH duration (~60ms for 20 WPM)
+unsigned long decoder_startttimelow;      // When LOW state started
+unsigned long decoder_lowduration;        // Duration of LOW state (silence)
+unsigned long decoder_laststarttime = 0;  // Last state change time
 
 // ===== Morse Code Buffer =====
-char decoder_code[20] = "";
-int decoder_stop = LOW;
+char decoder_code[20] = "";               // Accumulated Morse code string (e.g. ".-")
+int decoder_stop = LOW;                   // Flag to prevent multiple detections
 
 // ===== Sampling State Machine =====
-int decoder_sampleIndex = 0;
-bool decoder_readyToProcess = false;
+int decoder_sampleIndex = 0;              // Current sample index in buffer
+bool decoder_readyToProcess = false;      // Flag indicating buffer is full and ready to process
 
 /////////////////////////////////////////////////////////////////
-/// DecoderInit() - Initialisiert Dekoder beim Setup
+/// DecoderInit() - Initialize decoder at setup
 /////////////////////////////////////////////////////////////////
 void DecoderInit()
 {
-  // Berechne Goertzel-Koeffizient
+  // Calculate Goertzel coefficient for target frequency
   int k = (int)(0.5 + ((decoder_n * target_freq) / sampling_freq));
   float omega = (2.0 * PI * k) / decoder_n;
   decoder_coeff = 2.0 * cos(omega);
@@ -159,12 +158,13 @@ void DecoderInit()
 }
 
 /////////////////////////////////////////////////////////////////
-/// DecoderUpdate() - Non-blocking Dekoder Update
-// Rufe dies in jedem Loop auf wenn actual_menu == MONITOR
+/// DecoderUpdate() - Non-blocking decoder update
+// Call this in every loop when actual_menu == MONITOR
+// Implements a two-phase approach: sampling and processing
 /////////////////////////////////////////////////////////////////
 void DecoderUpdate()
 {
-  // ===== Sampling Phase: Sammle Samples nicht-blockierend =====
+  // ===== Sampling Phase: Collect samples non-blockingly =====
   if (decoder_sampleIndex < decoder_n) 
   {
     decoder_testData[decoder_sampleIndex] = analogRead(audioInPin);
@@ -174,15 +174,15 @@ void DecoderUpdate()
     {
       decoder_readyToProcess = true;
     }
-    return;  // Kurz raus aus dieser Iteration
+    return;  // Exit this iteration briefly
   }
 
-  // ===== Processing Phase: Verarbeite gesammelte Samples =====
+  // ===== Processing Phase: Process collected samples =====
   if (decoder_readyToProcess)
   {
-    DecoderProcessGoertzel();
-    DecoderUpdateStateLogic();
-    DecoderDetectMorse();
+    DecoderProcessGoertzel();       // Run Goertzel algorithm on samples
+    DecoderUpdateStateLogic();      // Apply hysteresis and debouncing
+    DecoderDetectMorse();           // Detect and decode Morse characters
 
     decoder_sampleIndex = 0;
     decoder_readyToProcess = false;
@@ -190,11 +190,13 @@ void DecoderUpdate()
 }
 
 /////////////////////////////////////////////////////////////////
-/// DecoderProcessGoertzel() - Goertzel-Algorithmus
+/// DecoderProcessGoertzel() - Goertzel Algorithm
+// Implements the Goertzel DFT algorithm to detect target frequency
+// in audio samples
 /////////////////////////////////////////////////////////////////
 void DecoderProcessGoertzel()
 {
-  // ===== Goertzel DFT Berechnung =====
+  // ===== Goertzel DFT Calculation =====
   for (int i = 0; i < decoder_n; i++) 
   {
     float Q0 = decoder_coeff * decoder_Q1 - decoder_Q2 + (float)decoder_testData[i];
@@ -202,15 +204,16 @@ void DecoderProcessGoertzel()
     decoder_Q1 = Q0;
   }
 
-  // ===== Magnitude berechnen =====
+  // ===== Calculate Magnitude =====
   float magnitudeSquared = (decoder_Q1 * decoder_Q1) + (decoder_Q2 * decoder_Q2) - decoder_Q1 * decoder_Q2 * decoder_coeff;
   decoder_magnitude = sqrt(magnitudeSquared);
 
-  // Reset für nächste Iteration
+  // Reset for next iteration
   decoder_Q1 = 0;
   decoder_Q2 = 0;
 
-  // ===== Adaptive Magnitude-Limit (WICHTIG für verschiedene Geschwindigkeiten) =====
+  // ===== Adaptive Magnitude Limit (IMPORTANT for different speeds) =====
+  // Continuously adapt threshold to compensate for varying input levels
   if (decoder_magnitude > decoder_magnitudelimit_low) 
   {
     decoder_magnitudelimit += (decoder_magnitude - decoder_magnitudelimit) / 6;
@@ -221,23 +224,25 @@ void DecoderProcessGoertzel()
 }
 
 /////////////////////////////////////////////////////////////////
-/// DecoderUpdateStateLogic() - Hysterese und Debouncing
+/// DecoderUpdateStateLogic() - Hysteresis and Debouncing
+// Applies threshold with hysteresis and debouncing to stabilize
+// state transitions
 /////////////////////////////////////////////////////////////////
 void DecoderUpdateStateLogic()
 {
   unsigned long now = micros();
 
-  // ===== Signal-Schwelle mit Hysterese =====
+  // ===== Signal threshold with hysteresis =====
   if (decoder_magnitude > decoder_magnitudelimit * 0.6)
     decoder_realstate = HIGH;
   else
     decoder_realstate = LOW;
 
-  // ===== State-Änderung erkennen =====
+  // ===== Detect state change =====
   if (decoder_realstate != decoder_realstatebefore)
     decoder_laststarttime = now;
 
-  // ===== Debouncing: Nur bei stabiler State-Änderung aktualisieren =====
+  // ===== Debouncing: Only update on stable state change =====
   if ((now - decoder_laststarttime) > decoder_nbtime)
     decoder_filteredstate = decoder_realstate;
 
@@ -245,7 +250,9 @@ void DecoderUpdateStateLogic()
 }
 
 /////////////////////////////////////////////////////////////////
-/// DecoderDetectMorse() - Morse-Erkennung
+/// DecoderDetectMorse() - Morse Detection
+// Measures tone and silence durations to detect dots and dashes
+// Recognizes character boundaries and word boundaries by timeout
 /////////////////////////////////////////////////////////////////
 void DecoderDetectMorse()
 {
@@ -255,50 +262,46 @@ void DecoderDetectMorse()
   {
     decoder_stop = LOW;
 
-    // ===== Übergang von HIGH zu LOW: Ton endete =====
+    // ===== Transition from HIGH to LOW: Tone ended =====
     if (decoder_filteredstate == LOW) 
     {
       decoder_startttimelow = now;
       decoder_highduration = now - decoder_starttimehigh;
 
-      // ===== Punkt oder Strich? =====
+      // ===== Dot or dash? =====
       if (decoder_highduration < (decoder_hightimesavg * 2)) 
       {
-        // Dit erkannt - lerne vom Dit
+        // Dot detected - learn from the dot duration
         decoder_hightimesavg = (decoder_highduration + decoder_hightimesavg + decoder_hightimesavg) / 3;
         if (strlen(decoder_code) < sizeof(decoder_code) - 1) 
           strcat(decoder_code, ".");
       } 
       else 
       {
-        // Dah erkannt - extrapoliere Dit-Länge aus Dah (Dah = 3×Dit)
+        // Dash detected - extrapolate dot length from dash (Dash = 3×Dot)
         unsigned long dit_estimate = decoder_highduration / 3;
         decoder_hightimesavg = (dit_estimate + decoder_hightimesavg + decoder_hightimesavg) / 3;
         if (strlen(decoder_code) < sizeof(decoder_code) - 1) 
           strcat(decoder_code, "-");
       }
-
-      //Serial.println("decoder_hightimesavg: " + String(decoder_hightimesavg));
-      //Serial.println("Duration: " + String(decoder_highduration));
-      //Serial.println("Magnitude: " + String(decoder_magnitude) + " | Limit: " + String(decoder_magnitudelimit));
     }
 
-    // ===== Übergang von LOW zu HIGH: Pause nach Ton =====
+    // ===== Transition from LOW to HIGH: Pause after tone =====
     if (decoder_filteredstate == HIGH) 
     {
       decoder_starttimehigh = now;
       decoder_lowduration = now - decoder_startttimelow;
 
-      // ===== Lange Pause = Zeichentrennung =====
+      // ===== Long pause = character separation =====
       if (decoder_lowduration > decoder_hightimesavg * 2) 
       {
-        DecoderDecodeMorse();
-        decoder_code[0] = '\0';
+        DecoderDecodeMorse();  // Decode accumulated Morse code
+        decoder_code[0] = '\0';  // Clear buffer
       }
     }
   }
 
-  // ===== Timeout: Sehr lange Pause = Wortende =====
+  // ===== Timeout: Very long pause = word end =====
   if ((now - decoder_startttimelow) > (decoder_highduration * 6) && decoder_stop == LOW) 
   {
     DecoderDecodeMorse();
@@ -310,7 +313,9 @@ void DecoderDetectMorse()
 }
 
 /////////////////////////////////////////////////////////////////
-/// DecoderDecodeMorse() - Morse-Code zu ASCII decodieren
+/// DecoderDecodeMorse() - Morse Code to ASCII Conversion
+// Decodes accumulated Morse code string to ASCII character
+// Supports letters (A-Z), numbers (0-9), and special characters
 /////////////////////////////////////////////////////////////////
 void DecoderDecodeMorse()
 {
@@ -318,7 +323,7 @@ void DecoderDecodeMorse()
 
   char c = ' ';
 
-  // ===== Buchstaben (A-Z) =====
+  // ===== Letters (A-Z) =====
   if (strcmp(decoder_code, ".-") == 0) c = 'A';
   else if (strcmp(decoder_code, "-...") == 0) c = 'B';
   else if (strcmp(decoder_code, "-.-.") == 0) c = 'C';
@@ -345,7 +350,7 @@ void DecoderDecodeMorse()
   else if (strcmp(decoder_code, "-..-") == 0) c = 'X';
   else if (strcmp(decoder_code, "-.--") == 0) c = 'Y';
   else if (strcmp(decoder_code, "--..") == 0) c = 'Z';
-  // ===== Zahlen (0-9) =====
+  // ===== Numbers (0-9) =====
   else if (strcmp(decoder_code, "-----") == 0) c = '0';
   else if (strcmp(decoder_code, ".----") == 0) c = '1';
   else if (strcmp(decoder_code, "..---") == 0) c = '2';
@@ -356,7 +361,7 @@ void DecoderDecodeMorse()
   else if (strcmp(decoder_code, "--...") == 0) c = '7';
   else if (strcmp(decoder_code, "---..") == 0) c = '8';
   else if (strcmp(decoder_code, "----.") == 0) c = '9';
-  // ===== Sonderzeichen =====
+  // ===== Special Characters =====
   else if (strcmp(decoder_code, "..--..") == 0) c = '?';
   else if (strcmp(decoder_code, ".-.-.-") == 0) c = '.';
   else if (strcmp(decoder_code, "--..--") == 0) c = ',';
@@ -372,12 +377,12 @@ void DecoderDecodeMorse()
   else if (strcmp(decoder_code, ".-.-.") == 0) c = '+';
   else if (strcmp(decoder_code, "-...-") == 0) c = '=';
 
-  // ===== Zeichen anzeigen und weitergeben =====
+  // ===== Display decoded character =====
   if (c != ' ') 
   {
-    Serial.print(c);  // Debug-Ausgabe
+    Serial.print(c);  // Debug output
 
-    // Zeige Zeichen auf Monitor-Display
+    // Display character on monitor display
     if (actual_menu == MONITOR)
     {
       if(char_on_screen >= 90)
@@ -396,82 +401,83 @@ void DecoderDecodeMorse()
 }
 
 /////////////////////////////////////////////////////////////////
-// notFound
+/// notFound() - HTTP 404 Handler
+// Sends a 404 error page when client requests non-existent path
 /////////////////////////////////////////////////////////////////
 void notFound() 
 {
-  server.send(404, "text/html", wrapInPage("<p>Seite nicht gefunden</p>"));
+  server.send(404, "text/html", wrapInPage("<p>Page not found</p>"));
 }
 
 /////////////////////////////////////////////////////////////////
-/// handleRoot() - HTTP GET / (Haupt-Seite)
-// Diese Funktion serviert die HTML-Seite, wenn ein Client
-// die Root-URL aufruft. Sie lädt gespeicherte Texte und
-// Überprüft, welche Buchstaben für das Training ausgewählt sind.
+/// handleRoot() - HTTP GET / (Main Page)
+// Serves the HTML page when a client calls the root URL
+// Loads stored texts and checks which letters are selected for training
 /////////////////////////////////////////////////////////////////
 void handleRoot() 
 {
-  String page = index_html;  // Lade HTML-Template
-  // Lese gespeicherte Texte aus EEPROM
+  String page = index_html;  // Load HTML template
+  
+  // Read stored texts from EEPROM
   String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
   String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
 
-  // Ersetze Platzhalter im HTML-Template mit aktuellen Werten
+  // Replace placeholders in HTML template with current values
   page.replace("%TEXT1%", text1);
   page.replace("%TEXT2%", text2);
   page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
 
-  // Sende Cache-Control Header (verhindert alte Versionen auf Android)
+  // Send cache control header (prevents old versions on Android)
   server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 
-  // Sende HTML-Seite an Client
+  // Send HTML page to client
   server.send(200, "text/html", page);
 }
 
 /////////////////////////////////////////////////////////////////
 /// handleSaveLetters() - HTTP POST /save_letters
-// Diese Funktion verarbeitet das Trainer-Formular: Speichert
-// ausgewählte Buchstaben im EEPROM und aktualisiert globale Variable.
+// Processes trainer form: saves selected letters to EEPROM
+// and updates global variable
 /////////////////////////////////////////////////////////////////
 void handleSaveLetters() 
 {
   String selected = "";
-  int args = server.args();  // Anzahl der Form-Parameter
+  int args = server.args();  // Number of form parameters
 
-  // Sammle alle ausgewählten Buchstaben (Parameter-Name: "letters")
+  // Collect all selected letters (parameter name: "letters")
   for (int i = 0; i < args; i++) 
   {
     if (server.argName(i) == "letters") 
     {
-      selected += server.arg(i);  // Hänge Buchstabe an
+      selected += server.arg(i);  // Append letter
     }
   }
 
-  // Speichere Auswahl im EEPROM und in globaler Variable
+  // Save selection to EEPROM and global variable
   WriteTextToEEPROM(0x40, selected);
-  selectedLetters = selected;  // Update globale Variable für Trainer
+  selectedLetters = selected;  // Update global variable for trainer
 
-  // Bestätigungs-Antwort an Client
+  // Send confirmation response to client
   String content = "<p>Saved: " + selected + "</p>";
   server.send(200, "text/html", wrapInPage(content));
 }
 
 /////////////////////////////////////////////////////////////////
-/// handleGet() - HTTP GET /get?input1=... oder /get?input2=...
-// Diese Funktion speichert Morse-Text aus dem Web-Formular.
+/// handleGet() - HTTP GET /get?input1=... or /get?input2=...
+// Saves Morse text from web form to EEPROM
 // Parameter input1 -> EEPROM_MEM1_ADDR
 // Parameter input2 -> EEPROM_MEM2_ADDR
 /////////////////////////////////////////////////////////////////
 void handleGet() 
 {
-  String inputParam = "none";  // Welcher Parameter empfangen wurde
+  String inputParam = "none";  // Which parameter was received
 
-  if (server.hasArg(TEXT_1))    // Prüfe auf input1-Parameter
+  if (server.hasArg(TEXT_1))    // Check for input1 parameter
   {
     WriteTextToEEPROM(EEPROM_MEM1_ADDR, server.arg(TEXT_1));
     inputParam = TEXT_1;
   } 
-  else if (server.hasArg(TEXT_2))  // Prüfe auf input2-Parameter
+  else if (server.hasArg(TEXT_2))  // Check for input2 parameter
   {
     WriteTextToEEPROM(EEPROM_MEM2_ADDR, server.arg(TEXT_2));
     inputParam = TEXT_2;
@@ -482,29 +488,29 @@ void handleGet()
 }
 
 /////////////////////////////////////////////////////////////////
-/// generateLetterCheckboxes() - Erzeugt HTML für Buchstaben-Checkboxen
-// Diese Funktion generiert HTML-Formular-Elemente für alle 26 Buchstaben.
-// Sie erkennt, welche Buchstaben zuvor ausgewählt wurden, und
-// markiert diese als "checked".
+/// generateLetterCheckboxes() - Generate HTML for Letter Checkboxes
+// Generates HTML form elements for all 26 letters
+// Recognizes previously selected letters and marks them as "checked"
 /////////////////////////////////////////////////////////////////
 String generateLetterCheckboxes() 
 {
   String html = "";
-  // Durchlaufe alle 26 Buchstaben
+  
+  // Loop through all 26 letters
   for (int i = 0; i < 26; i++) 
   {
-    char letterChar = pgm_read_byte(&LETTERS[i]);  // Lese Buchstabe aus PROGMEM
-    String letter = String(letterChar);             // Konvertiere zu String
-    bool checked = selectedLetters.indexOf(letter) != -1;  // War dieser Buchstabe gewählt?
+    char letterChar = pgm_read_byte(&LETTERS[i]);  // Read letter from PROGMEM
+    String letter = String(letterChar);             // Convert to String
+    bool checked = selectedLetters.indexOf(letter) != -1;  // Was this letter selected?
 
-    // Erzeuge Checkbox-HTML
+    // Generate checkbox HTML
     html += "<input type='checkbox' name='letters' value='" + letter + "' id='l" + String(i) + "'";
     if (checked) 
-      html += " checked";  // Markiere als bereits gewählt
+      html += " checked";  // Mark as already selected
     html += ">";
     html += "<label for='l" + String(i) + "'>" + letter + "</label> ";
 
-    // Neue Zeile nach 7 Buchstaben für bessere Formatierung
+    // New line after 7 letters for better formatting
     if ((i+1) % 7 == 0) 
       html += "<br>";
   }
@@ -512,43 +518,43 @@ String generateLetterCheckboxes()
 }
 
 /////////////////////////////////////////////////////////////////
-/// setup() - Arduino Initialisierung
-// Diese Funktion wird einmal beim Start aufgerufen und
-// initialisiert alle Hardware-Komponenten und Variablen:
-// - EEPROM (lade gespeicherte WPM, Texte, Buchstaben)
+/// setup() - Arduino Initialization
+// Called once at startup
+// Initializes all hardware components and variables:
+// - EEPROM (load stored WPM, texts, letters)
 // - Display (OLED)
-// - Eingabe-Pins (Keyer, Mode-Button)
-// - Audio-Outputs (Buzzer, Speaker)
+// - Input pins (Keyer, Mode button)
+// - Audio outputs (Buzzer, Speaker)
 // - WiFi/WebServer (optional)
 /////////////////////////////////////////////////////////////////
 void setup() 
 {
-  DEBUG_BEGIN(SERIAL_SPEED);  // Serielle Debug-Ausgabe (wenn DEBUG_PRINT definiert)
+  DEBUG_BEGIN(SERIAL_SPEED);  // Serial debug output (if DEBUG_PRINT is defined)
 
-  // ===== WiFi und Server initial AUS =====
+  // ===== WiFi and Server initially OFF =====
   SwitchSettings(0);
 
-  // ===== EEPROM Initialisierung =====
+  // ===== EEPROM Initialization =====
   DEBUG_PRINTLN("- EEPROM INIT -");
-  EEPROM.begin(EEPROM_SIZE);  // EEPROM initialisieren
+  EEPROM.begin(EEPROM_SIZE);
 
-  // ===== Lade WPM aus EEPROM =====
+  // ===== Load WPM from EEPROM =====
   byte value;
   value = EEPROM.read(EEPROM_WPM_ADDR);
   DEBUG_PRINT("Read wpm: ");
   DEBUG_PRINTLN(value, DEC);
 
-  // Validiere WPM: Muss zwischen 0 und 99 liegen
+  // Validate WPM: Must be between 0 and 99
   if(value >= 100 || value < 0)
   {
-    wpm = START_POS;  // Verwende Standardwert falls ungültig
+    wpm = START_POS;  // Use default value if invalid
   }
   else
   {
-    wpm = value;  // Verwende gespeicherten Wert
+    wpm = value;  // Use stored value
   }
 
-  // ===== Lade Farnsworth-WPM aus EEPROM =====
+  // ===== Load Farnsworth WPM from EEPROM =====
   value = EEPROM.read(EEPROM_FWPM_ADDR);
   DEBUG_PRINT("Read fwpm: ");
   DEBUG_PRINTLN(value, DEC);
@@ -561,104 +567,105 @@ void setup()
     fwpm = value;
   }
 
-  // Berechne alle Timing-Konstanten basierend auf WPM
+  // Calculate all timing constants based on WPM
   CalculateTimes(wpm, fwpm);
 
-  // Lade gespeicherte Texte aus EEPROM (für Speicher 1 und 2)
+  // Load stored texts from EEPROM (for memories 1 and 2)
   ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
   ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
 
-  // ===== Lade Speaker-Status aus EEPROM =====
+  // ===== Load Speaker Status from EEPROM =====
   value = EEPROM.read(EEPROM_SPEAKER_ADDR);
   DEBUG_PRINT("Read Speaker setup: ");
   DEBUG_PRINTLN(value, DEC);
   SwitchSpeaker((byte)value);
 
-  // Lade Buchstaben-Auswahl für Trainer
+  // Load letter selection for trainer
   selectedLetters = ReadTextFromEEPROM(0x40);
 
-  // ===== OLED Display Initialisierung =====
-  DEBUG_PRINTLN("- BUZZER INIT -");
-  display.begin();  // Starte OLED-Display
-  ShowMainScreen(); // Zeige Start-Bildschirm
+  // ===== OLED Display Initialization =====
+  DEBUG_PRINTLN("- DISPLAY INIT -");
+  display.begin();   // Start OLED display
+  ShowMainScreen();  // Show startup screen
 
-  // ===== Rotary Encoder Initialisierung =====
+  // ===== Rotary Encoder Initialization =====
   r.begin(ROTARY_PIN2, ROTARY_PIN1, CLICKS_PER_STEP);
-  r.setChangedHandler(rotate);  // Setze Callback für Drehung
+  r.setChangedHandler(rotate);  // Set callback for rotation
 
-  // ===== Buzzer-Pin Initialisierung =====
+  // ===== Buzzer Pin Initialization =====
   DEBUG_PRINTLN("- BUZZER INIT -");
   pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, 0);  // Buzzer starten deaktiviert
+  digitalWrite(BUZZER_PIN, 0);  // Buzzer start disabled
 
-  // ===== Keyer-Tasten Initialisierung =====
+  // ===== Keyer Buttons Initialization =====
   DEBUG_PRINTLN("- KEYER INIT -");
-  pinMode(KEYER_SHORT_PIN, INPUT_PULLUP);  // Punkt-Paddel
-  pinMode(KEYER_LONG_PIN, INPUT_PULLUP);   // Strich-Paddel
+  pinMode(KEYER_SHORT_PIN, INPUT_PULLUP);  // Dot paddle
+  pinMode(KEYER_LONG_PIN, INPUT_PULLUP);   // Dash paddle
 
-  // ===== Mode-Button Initialisierung =====
+  // ===== Mode Button Initialization =====
   DEBUG_PRINTLN("- BUTTON INIT -");
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
 
-  // ===== Speaker-Pin Initialisierung =====
-  pinMode(SPEAKER_PIN, OUTPUT);  // Für Ton-Ausgabe (Frequenz mit tone())
+  // ===== Speaker Pin Initialization =====
+  pinMode(SPEAKER_PIN, OUTPUT);  // For tone output (frequency via tone())
 
-  // ===== Audio Decoder Initialisierung =====
+  // ===== Audio Decoder Initialization =====
   DEBUG_PRINTLN("- AUDIO DECODER INIT -");
   DecoderInit();
 }
 
 /////////////////////////////////////////////////////////////////
-/// startBeep() - Startet einen Ton nicht-blockierend
-// Diese Funktion startet einen Piep-Ton mit einer bestimmten
-// Länge. Der Ton wird nicht blockierend ausgespielt - die Funktion
-// kehrt sofort zurück und updateBeep() verwaltet das Beenden.
+/// startBeep() - Start a Tone Non-blockingly
+// Starts a beep tone with specified length
+// Tone is played non-blockingly - function returns immediately
+// and updateBeep() manages the tone ending
 /////////////////////////////////////////////////////////////////
 void startBeep(unsigned int length, char symbol)
 {
-  noTone(SPEAKER_PIN);        // Stelle sicher, dass kein alter Ton läuft
-  tone(SPEAKER_PIN, 1000);    // Starte 1000 Hz Ton auf Speaker
+  noTone(SPEAKER_PIN);        // Ensure no old tone is running
+  tone(SPEAKER_PIN, 1000);    // Start 1000 Hz tone on speaker
 
-  if (speakerOn)              // Wenn Buzzer aktiviert ist
-    digitalWrite(BUZZER_PIN, HIGH);  // Buzzer auch einschalten
+  if (speakerOn)              // If buzzer is enabled
+    digitalWrite(BUZZER_PIN, HIGH);  // Turn on buzzer too
 
-  beeping = true;             // Markiere als Ton läuft
-  beepEnd = millis() + length;  // Berechne Endzeit
-  DEBUG_PRINT(symbol);        // Debug-Ausgabe des Symbols
+  beeping = true;             // Mark tone as running
+  beepEnd = millis() + length;  // Calculate end time
+  DEBUG_PRINT(symbol);        // Debug output of symbol
 }
 
 /////////////////////////////////////////////////////////////////
-// updateBeep() - Verwaltet Beep-Timing (non-blocking)
-// Diese Funktion wird in jedem Loop aufgerufen und prüft, ob ein Beep
-// beendet werden soll oder eine Pause starten soll. So wird verhindert,
-// dass der Hauptloop blockiert wird.
+/// updateBeep() - Manage Beep Timing (Non-blocking)
+// Called in every loop iteration
+// Checks if beep should end or pause should start
+// Prevents main loop from being blocked
 /////////////////////////////////////////////////////////////////
 void updateBeep()
 {
- unsigned long now = millis();
+  unsigned long now = millis();
 
-    // Wenn der Beep die geplante Endzeit erreicht hat
-    if(beeping && now >= beepEnd)
-    {
-      noTone(SPEAKER_PIN);      // Ton auf Speaker ausschalten
-      digitalWrite(BUZZER_PIN, LOW);  // Buzzer ausschalten
-      beeping = false;
+  // If beep reached its planned end time
+  if(beeping && now >= beepEnd)
+  {
+    noTone(SPEAKER_PIN);      // Turn off speaker tone
+    digitalWrite(BUZZER_PIN, LOW);  // Turn off buzzer
+    beeping = false;
 
-      // Starte automatisch eine Pause nach dem Ton (1T)
-      inPause = true;
-      pauseEnd = now + elementGap;  // Pause dauert 1T
-    }
+    // Automatically start pause after tone (1T)
+    inPause = true;
+    pauseEnd = now + elementGap;  // Pause lasts 1T
+  }
 
-    // Wenn die Pause vorbei ist
-    if(inPause && now >= pauseEnd)
-    {
-      inPause = false;      // Pause beendet - nächster Ton kann beginnen
-      lastKeyTime = now;    // WICHTIG: Aktualisiere lastKeyTime für Zeichenerkennung
-    }
+  // If pause is finished
+  if(inPause && now >= pauseEnd)
+  {
+    inPause = false;      // Pause ended - next tone can begin
+    lastKeyTime = now;    // IMPORTANT: Update lastKeyTime for character recognition
+  }
 }
 
 /////////////////////////////////////////////////////////////////
-// startPlayback
+/// startPlayback() - Start Text Playback
+// Initializes playback of stored text as Morse code
 /////////////////////////////////////////////////////////////////
 void startPlayback(String text)
 {
@@ -667,126 +674,128 @@ void startPlayback(String text)
   currentMorse = "";
   morseIndex = 0;
   playing = true;
-  nextActionTime = millis(); // sofort loslegen
+  nextActionTime = millis(); // Start immediately
 }
 
 /////////////////////////////////////////////////////////////////
-// updatePlayback() - Wiedergabe von gespeicherten Texten (non-blocking)
-// Diese Funktion kontrolliert die Wiedergabe von Morse-Code. Sie:
-// 1. Konvertiert Zeichen zu Morse-Code
-// 2. Spielt Punkte (dit) und Striche (dah) mit korrektem Timing ab
-// 3. Erzeugt korrekte Pausen zwischen Elementen, Buchstaben und Wörtern
+/// updatePlayback() - Update Playback of Stored Text (Non-blocking)
+// Controls Morse code playback
+// 1. Converts characters to Morse code
+// 2. Plays dots (dit) and dashes (dah) with correct timing
+// 3. Creates correct pauses between elements, letters, and words
 /////////////////////////////////////////////////////////////////
 void updatePlayback()
 {
-  if (!playing)           // Wenn keine Wiedergabe läuft, nichts tun
+  if (!playing)           // If no playback is running, do nothing
     return;
 
   unsigned long now = millis();
-  if (now < nextActionTime)  // Warte, bis die Zeit für die nächste Aktion reif ist
+  if (now < nextActionTime)  // Wait until time for next action
     return;
 
-  // ===== Nächstes Zeichen laden, wenn das aktuelle Morse-Code fertig ist =====
+  // ===== Load next character when current Morse code is done =====
   if (currentMorse.length() == 0)
   {
-    // Überprüfe, ob wir alle Zeichen des Textes abgespielt haben
+    // Check if we've played all characters
     if (playbackIndex >= playbackText.length())
     {
-      playing = false;  // Wiedergabe beendet
+      playing = false;  // Playback finished
       return;
     }
 
-    char c = playbackText[playbackIndex++];  // Nächstes Zeichen aus dem Text
+    char c = playbackText[playbackIndex++];  // Next character from text
     if (c == ' ')
     {
-      // Wortpause: 7T total, aber 1T (elementGap) ist schon zwischen Buchstaben
-      // Also nur wordExtra (6T extra) hinzufügen
+      // Word pause: 7T total, but 1T (elementGap) already counted between letters
+      // So only add wordExtra (6T extra)
       nextActionTime = now + wordExtra;
       return;
     }
     else
     {
-      // Konvertiere Buchstabe zu Morse-Code (z.B. 'A' -> ".-")
+      // Convert letter to Morse code (e.g. 'A' -> ".-")
       currentMorse = EncodeChar(c);
-      morseIndex = 0;  // Starten Sie vom ersten Symbol des Morse-Codes
+      morseIndex = 0;  // Start from first symbol of Morse code
     }
   }
 
-  // ===== Nächstes Symbol (Punkt oder Strich) des aktuellen Buchstabens =====
+  // ===== Next symbol (dot or dash) of current letter =====
   if (morseIndex < currentMorse.length())
   {
-    char sym = currentMorse[morseIndex++];  // Aktuelles Symbol ('.' oder '-')
-    unsigned int len = (sym == '.') ? dit_len : dah_len;  // Länge basierend auf Symbol
-    startBeep(len, sym);  // Beep starten
-    // Nach dem Beep: warte auf Beeplänge + 1T (elementGap) für nächstes Symbol
+    char sym = currentMorse[morseIndex++];  // Current symbol ('.' or '-')
+    unsigned int len = (sym == '.') ? dit_len : dah_len;  // Length based on symbol
+    startBeep(len, sym);  // Start beep
+    // After beep: wait for beep length + 1T (elementGap) for next symbol
     nextActionTime = now + len + elementGap;
   }
   else
   {
-    // Alle Symbole des Buchstabens abgespielt
-    // Warte auf Buchstabenpause minus der bereits verbrauchten 1T (elementGap)
-    currentMorse = "";  // Buffer für nächsten Buchstaben leeren
-    nextActionTime = now + letterExtra;  // Zusätzliche Pause vor nächstem Buchstabe
+    // All symbols of letter played
+    // Wait for letter pause minus already consumed 1T (elementGap)
+    currentMorse = "";  // Clear buffer for next letter
+    nextActionTime = now + letterExtra;  // Extra pause before next letter
   }
 }
 
 /////////////////////////////////////////////////////////////////
-// CalcDisplayPosition
+/// CalcDisplayPosition() - Calculate Display Position from Character Count
+// Converts linear character index to row and column on OLED display
+// Assumes 15 characters per row (0-14)
 /////////////////////////////////////////////////////////////////
 void CalcDisplayPosition( short chars_on_display, int* r, int* c )
 {
-  *r = chars_on_display / 15;
-  *c = chars_on_display % 15;
+  *r = chars_on_display / 15;  // Row (0-7)
+  *c = chars_on_display % 15;  // Column (0-14)
 }
 
 /////////////////////////////////////////////////////////////////
-// loop() - Hauptschleife
-// Diese Funktion läuft ständig und:
-// 1. Verarbeitet Benutzereingaben (Tasten, Encoder, Mode-Button)
-// 2. Aktualisiert Beep und Playback-Timing
-// 3. Dekodiert Morse-Code und zeigt Ergebnisse an
-// 4. Verwaltet das Web-Interface (falls aktiviert)
+/// loop() - Main Loop
+// Runs continuously
+// 1. Processes user inputs (buttons, encoder, mode button)
+// 2. Updates beep and playback timing
+// 3. Decodes Morse code and displays results
+// 4. Manages web interface (if enabled)
 /////////////////////////////////////////////////////////////////
 void loop() 
 {
-    // ===== Zustands-Flag für Zeichenerkennung =====
-    // Verhindert, dass ein Zeichen mehrmals verarbeitet wird, wenn
-    // die Pause nach einem Zeichen abgelaufen ist
+    // ===== State Flag for Character Recognition =====
+    // Prevents character from being processed multiple times when
+    // pause after character has elapsed
     static bool letterProcessed = false;
 
-    // ===== Audio Dekoder - ZEITKRITISCH =====
-    // Wird MIT HOHER PRIORITÄT aufgerufen, bevor Server/UI verarbeitet werden
+    // ===== Audio Decoder - TIME CRITICAL =====
+    // Called with HIGH PRIORITY before server/UI processing
     if (actual_menu == MONITOR)
     {
-      DecoderUpdate();  // Non-blocking Audio-Dekodierung
+      DecoderUpdate();  // Non-blocking audio decoding
     }
 
+    // Handle web server requests (only when not in monitor mode)
     if (settingsOn && actual_menu != MONITOR) 
     {
         server.handleClient();
     }
 
-    r.loop();
+    r.loop();  // Update rotary encoder state
 
-    // Encoder Button
+    // ===== Mode Button (Menu Navigation) =====
     if(digitalRead(MODE_BUTTON_PIN) == LOW)
     {
         StateMachine(MODE_BUTTON_PIN);
-        delay(250);
+        delay(250);  // Debounce delay
     }
 
-    // ===== Keyer-Eingabe (Paddel) =====
-
-    bool dit = digitalRead(KEYER_SHORT_PIN) == LOW;
-    bool dah = digitalRead(KEYER_LONG_PIN) == LOW;
+    // ===== Keyer Input (Paddles) =====
+    bool dit = digitalRead(KEYER_SHORT_PIN) == LOW;  // Dot paddle pressed
+    bool dah = digitalRead(KEYER_LONG_PIN) == LOW;   // Dash paddle pressed
 
     static bool lastWasDit = false;
     static bool iambicModeActive = false;
 
-    // Nur wenn bereit
+    // Only process if no beep or pause is running
     if(!beeping && !inPause)
     {
-        // ===== IAMBIC START =====
+        // ===== IAMBIC Mode A: Both paddles pressed =====
         if(dit && dah)
         {
             iambicModeActive = true;
@@ -806,7 +815,7 @@ void loop()
             letterProcessed = false;
         }
 
-        // ===== EINZEL DIT =====
+        // ===== Single Dot =====
         else if(dit && !iambicModeActive)
         {
             StateMachine(KEYER_SHORT_PIN);
@@ -816,7 +825,7 @@ void loop()
             letterProcessed = false;
         }
 
-        // ===== EINZEL DAH =====
+        // ===== Single Dash =====
         else if(dah && !iambicModeActive)
         {
             StateMachine(KEYER_LONG_PIN);
@@ -826,12 +835,12 @@ void loop()
             letterProcessed = false;
         }
 
-        // ===== IAMBIC MODE B: letzter Impuls =====
+        // ===== IAMBIC Mode B: Last impulse =====
         else if(iambicModeActive)
         {
             iambicModeActive = false;
 
-            // 🔥 letzter Gegenton
+            // Last opposite tone
             if(lastWasDit)
             {
                 StateMachine(KEYER_LONG_PIN);
@@ -848,12 +857,12 @@ void loop()
         }
     }
     
-    updateBeep();
-    updatePlayback();
+    updateBeep();      // Update beep state
+    updatePlayback();  // Update playback state
 
-    // ===== Zeichenerkennung für Monitor und Trainer-Modi =====
-    // Im Monitor-Modus: Zeige jeden erkannten Buchstaben an
-    // Im Trainer-Modus: Vergleiche Eingabe mit erwartetem Buchstaben
+    // ===== Character Recognition for Monitor and Trainer Modes =====
+    // Monitor Mode: Display each recognized letter
+    // Trainer Mode: Compare input with expected letter
     if(actual_menu == MONITOR || 
        actual_menu == TRAINER_GIVE_RANDOM_SCREEN || 
        actual_menu == TRAINER_GIVE_AZ_SCREEN ||
@@ -861,25 +870,26 @@ void loop()
     {
         unsigned long now = millis();
 
-        // ===== Trigger: Zeichen wurde vollständig eingegeben =====
-        // Prüfungen:
-        // 1. decoderString hat Daten (mindestens ein Punkt/Strich)
-        // 2. Kein Beep oder Pause läuft
-        // 3. Genug Zeit ist vergangen seit letzter Eingabe (letterExtra)
-        // 4. Zeichen wurde noch nicht verarbeitet (letterProcessed = false)
+        // ===== Trigger: Character was fully entered =====
+        // Checks:
+        // 1. decoderString has data (at least one dot/dash)
+        // 2. No beep or pause is running
+        // 3. Enough time has passed since last input (letterExtra)
+        // 4. Character has not been processed yet (letterProcessed = false)
         if(decoderString.length() > 0 && 
            !beeping && 
            !inPause && 
            (now - lastKeyTime) >= letterExtra &&
            !letterProcessed)
         {
-            letterProcessed = true;  // Verhindere Verarbeitung bis zum nächsten Zeichen
+            letterProcessed = true;  // Prevent processing until next character
 
             String decodedLetter = DecodeMorseCode(decoderString);
             char buf[2] = { decodedLetter[0], '\0' };
 
             if(actual_menu == MONITOR)
             {
+                // Display decoded character on monitor
                 if(char_on_screen >= 90)
                 {
                     char_on_screen = 0;
@@ -895,6 +905,7 @@ void loop()
                     actual_menu == TRAINER_GIVE_AZ_SCREEN ||
                     actual_menu == TRAINER_LISTEN_REPEAT_SCREEN)
             {
+                // Check trainer answer
                 if(buf[0] == currentTrainerLetter)
                 {
                     display.clear();
@@ -904,11 +915,12 @@ void loop()
                 {
                     display.clear();
                     display.print("Not Correct !", 4, 2);
-                    ProcessSign(currentTrainerLetter);
+                    ProcessSign(currentTrainerLetter);  // Play correct letter
                 }
 
                 delay(1000);
 
+                // Load next trainer question
                 if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
                     ShowTrainerGiveRandomScreen();
                 else if(actual_menu == TRAINER_GIVE_AZ_SCREEN)
@@ -924,64 +936,66 @@ void loop()
                 }
             }
 
-            decoderString = ""; // 🔥 Buffer leeren für nächstes Zeichen
+            decoderString = "";  // Clear buffer for next character
         }
     }
 
-    StateMachine(NO_KEY);
+    StateMachine(NO_KEY);  // Process state machine with no key
 }
 
 /////////////////////////////////////////////////////////////////
-/// StateMachine() - Zentrale Eingabeverarbeitung
-// Diese Funktion verwaltet die Interpretation von Benutzereingaben:
-// - KEYER_SHORT_PIN: Punkt eingeben (dit)
-// - KEYER_LONG_PIN: Strich eingeben (dah)
-// - MODE_BUTTON_PIN: Menünavigation und Funktionen
+/// StateMachine() - Central Input Processing
+// Manages interpretation of user inputs:
+// - KEYER_SHORT_PIN: Enter dot (dit)
+// - KEYER_LONG_PIN: Enter dash (dah)
+// - MODE_BUTTON_PIN: Menu navigation and functions
 /////////////////////////////////////////////////////////////////
 void StateMachine(int key)
 {
-  // Gegenwärtig gibt es nur einen Zustand (STATE_IDLE)
-  // Dies könnte in Zukunft erweitert werden (z.B. für Menü-Bearbeitung)
+  // Currently only one state (STATE_IDLE)
+  // Could be extended in future (e.g. for menu editing)
   if(State == STATE_IDLE)
   {
-    // ===== Kurze Paddel-Taste (Punkt) =====
+    // ===== Short Paddle Button (Dot) =====
     if(key == KEYER_SHORT_PIN)
     {
-      // Nur verarbeiten, wenn kein Ton läuft (verhindert Überlagerung)
+      // Only process if no tone is running (prevents overlap)
       if(!beeping && !inPause)
       {
-        ProcessBeep(dit_len, '.');  // Punkt-Beep mit korrekter Länge
-        decoderString += ".";       // Punkt zum Dekodierungs-Buffer hinzufügen
-        key_activated = millis();   // Zeitstempel speichern
+        ProcessBeep(dit_len, '.');  // Dot beep with correct length
+        decoderString += ".";       // Add dot to decoding buffer
+        key_activated = millis();   // Store timestamp
       }
     }
 
-    // ===== Lange Paddel-Taste (Strich) =====
+    // ===== Long Paddle Button (Dash) =====
     if(key == KEYER_LONG_PIN)
     {
-      // Nur verarbeiten, wenn kein Ton läuft
+      // Only process if no tone is running
       if(!beeping && !inPause)
       {
-        ProcessBeep(dah_len, '-');  // Strich-Beep mit korrekter Länge
-        decoderString += "-";       // Strich zum Dekodierungs-Buffer hinzufügen
-        key_activated = millis();   // Zeitstempel speichern
+        ProcessBeep(dah_len, '-');  // Dash beep with correct length
+        decoderString += "-";       // Add dash to decoding buffer
+        key_activated = millis();   // Store timestamp
       }
     }
 
-    // ===== Mode-Button (Menü-Navigation und Funktionsaufrufe) =====
+    // ===== Mode Button (Menu Navigation and Functions) =====
     if(key == MODE_BUTTON_PIN)
     {
-      ReactOnButtonClick();  // Rufe Menü-Handler auf
+      ReactOnButtonClick();  // Call menu handler
     }
   }
 }
 
 /////////////////////////////////////////////////////////////////
-/// ReactOnButtonClick
+/// ReactOnButtonClick() - Handle Mode Button Clicks
+// Routes button clicks to appropriate menu or action handlers
+// Behavior depends on current menu (actual_menu)
 /////////////////////////////////////////////////////////////////
 void ReactOnButtonClick()
 {
-  // MAIN_MENU
+  // ===== MAIN_MENU =====
   if(actual_menu == MAIN_MENU)
   {
     DEBUG_PRINTLN("MAIN_MENU");
@@ -1009,24 +1023,24 @@ void ReactOnButtonClick()
 
     if(selected_menu_item == TRAINER)
     {
-      DEBUG_PRINTLN("ShowTimerScreen");
+      DEBUG_PRINTLN("ShowTrainerScreen");
       ShowTrainerScreen();
       return;
     }
   }
 
-  // CW_KEYER
+  // ===== CW_KEYER =====
   if(actual_menu == CW_KEYER)
   {
      DEBUG_PRINTLN("KEYER");
      
     if(selected_menu_item == SPEED && speed_mode == false)
     {
-      speed_mode = true;
+      speed_mode = true;  // Enable speed adjustment mode
     }
     else if(selected_menu_item == SPEED && speed_mode == true)
     {
-      speed_mode = false;
+      speed_mode = false;  // Disable speed adjustment mode
     }
 
     if(selected_menu_item == MEM_1)
@@ -1036,8 +1050,8 @@ void ReactOnButtonClick()
       return;
     }
 
-     if(selected_menu_item == MEM_2)
-     {
+    if(selected_menu_item == MEM_2)
+    {
       PlayMemory(EEPROM_MEM2_ADDR);
       DEBUG_PRINTLN("Play Mem 2");
       return;
@@ -1051,7 +1065,7 @@ void ReactOnButtonClick()
     }
   }
 
-  // TRAINER
+  // ===== TRAINER =====
   if(actual_menu == TRAINER)
   {
      DEBUG_PRINTLN("TRAINER");
@@ -1072,7 +1086,7 @@ void ReactOnButtonClick()
 
     if (selected_menu_item == TRAINER_GIVE_AZ)
     {
-      DEBUG_PRINTLN("Trainer Give AZ");
+      DEBUG_PRINTLN("Trainer Give A-Z");
       selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       currentAZPosition = -1;
       ShowTrainerGiveAZScreen();
@@ -1093,13 +1107,15 @@ void ReactOnButtonClick()
       return;
     }
   }
-  // MONITOR
+
+  // ===== MONITOR =====
   if(actual_menu == MONITOR)
   {
     ShowMainScreen();
     return;
   }
 
+  // ===== TRAINER Screen Return Handlers =====
   if(actual_menu == TRAINER_GIVE_RANDOM_SCREEN)
   {
     ShowTrainerScreen();
@@ -1120,18 +1136,19 @@ void ReactOnButtonClick()
 
   if(actual_menu == TRAINER_GIVE_AZ_SCREEN)
   {
-    selectedLetters = ReadTextFromEEPROM(0x40); 
+    selectedLetters = ReadTextFromEEPROM(0x40);  // Restore saved letter selection
     ShowTrainerScreen();
     return;
   }
 
-  // SETUP
+  // ===== SETUP =====
   if(actual_menu == SETUP)
   {
      DEBUG_PRINTLN("SETUP");
      
     if(selected_menu_item == SETUP_SPEAKER)
     {
+      // Toggle speaker on/off
       if(speakerOn == true)
       {
         SwitchSpeaker(false);
@@ -1150,6 +1167,7 @@ void ReactOnButtonClick()
 
     if(selected_menu_item == SETUP_SETTINGS)
     {
+      // Toggle WiFi settings on/off
       if(settingsOn == true)
       {
         SwitchSettings(false);
@@ -1168,11 +1186,11 @@ void ReactOnButtonClick()
 
     if(selected_menu_item == SETUP_FARNSWORTH && fspeed_mode == false)
     {
-      fspeed_mode = true;
+      fspeed_mode = true;  // Enable Farnsworth speed adjustment
     }
     else if(selected_menu_item == SETUP_FARNSWORTH && fspeed_mode == true)
     {
-      fspeed_mode = false;
+      fspeed_mode = false;  // Disable Farnsworth speed adjustment
     }
 
     if(selected_menu_item == SETUP_BACK)
@@ -1185,136 +1203,132 @@ void ReactOnButtonClick()
 }
 
 /////////////////////////////////////////////////////////////////
-/// SwitchSpeaker() - Aktiviert oder deaktiviert Buzzer
-// Diese Funktion schaltet den Buzzer-Output um und speichert
-// den Status im EEPROM, damit er beim nächsten Start wieder
-// hergestellt wird.
+/// SwitchSpeaker() - Enable or Disable Buzzer
+// Toggles buzzer output on/off and saves status to EEPROM
+// Status is restored on next startup
 /////////////////////////////////////////////////////////////////
 void SwitchSpeaker(byte value)
 {
-  // Konvertiere Byte-Wert zu Boolean
+  // Convert byte value to boolean
   if(value == 0)
     speakerOn = false;
   else
     speakerOn = true;
 
-  // Speichere Status im EEPROM
+  // Save status to EEPROM
   EEPROM.write(EEPROM_SPEAKER_ADDR, speakerOn);
-  EEPROM.commit();  // Schreibe in EEPROM
+  EEPROM.commit();  // Write to EEPROM
 }
 
 /////////////////////////////////////////////////////////////////
-/// SwitchSettings() - Aktiviert oder deaktiviert WiFi und Web-Server
-// Diese Funktion ermöglicht die WiFi-Verbindung und startet
-// einen Access Point, um sich über Browser zu verbinden und
-// Einstellungen zu ändern (Speichertexte, Trainer-Buchstaben).
+/// SwitchSettings() - Enable or Disable WiFi and Web Server
+// Enables WiFi connection and starts access point for
+// browser access to change settings (stored texts, trainer letters)
 /////////////////////////////////////////////////////////////////
 void SwitchSettings(byte value)
 {
   if(value == 0) 
   {
-    // ===== WiFi und Server AUSSCHALTEN =====
+    // ===== Turn WiFi and Server OFF =====
     settingsOn = false;
 
-    // Herunterfahren aller WiFi-Komponenten
-    server.stop();                  // Stoppe Web-Server
-    WiFi.disconnect(true);          // Trenne WiFi und deaktiviere AP
-    WiFi.mode(WIFI_OFF);            // Schalte WLAN komplett aus
+    // Shut down all WiFi components
+    server.stop();                  // Stop web server
+    WiFi.disconnect(true);          // Disconnect WiFi and disable AP
+    WiFi.mode(WIFI_OFF);            // Turn WLAN completely off
     DEBUG_PRINTLN("WiFi/Server OFF");
   }
   else 
   {
-    // ===== WiFi und Server EINSCHALTEN =====
+    // ===== Turn WiFi and Server ON =====
     settingsOn = true;
 
-    // ===== Starte Access Point =====
-    WiFi.mode(WIFI_AP);            // Wechsel zu Access Point Modus
-    WiFi.softAP(ssid, password);    // Erstelle AP mit SSID und Passwort
+    // ===== Start Access Point =====
+    WiFi.mode(WIFI_AP);            // Switch to Access Point mode
+    WiFi.softAP(ssid, password);    // Create AP with SSID and password
 
-    // Setze feste IP-Adresse für den Access Point
-    IPAddress Ip(192, 168, 4, 2);           // AP IP-Adresse
-    IPAddress NMask(255, 255, 255, 0);     // Netzmaske
+    // Set fixed IP address for the access point
+    IPAddress Ip(192, 168, 4, 2);           // AP IP address
+    IPAddress NMask(255, 255, 255, 0);     // Network mask
     WiFi.softAPConfig(Ip, Ip, NMask);
 
     DEBUG_PRINTLN(WiFi.localIP());
 
-    // ===== Registriere Web-Handler (Routen) =====
-    server.on("/", handleRoot);             // GET / -> Zeige HTML
-    server.on("/save_letters", handleSaveLetters);  // POST /save_letters -> Speichere Buchstaben
-    server.on("/get", handleGet);           // GET /get?input1=... -> Speichere Morse-Text
+    // ===== Register Web Handlers (Routes) =====
+    server.on("/", handleRoot);             // GET / -> Show HTML
+    server.on("/save_letters", handleSaveLetters);  // POST /save_letters -> Save letters
+    server.on("/get", handleGet);           // GET /get?input1=... -> Save Morse text
     server.onNotFound(notFound);            // 404 Handler
-    server.begin();                         // Starte Web-Server
+    server.begin();                         // Start web server
 
     DEBUG_PRINTLN("WiFi/Server ON");
   }
 }
 
 /////////////////////////////////////////////////////////////////
-/// ProcessBeep() - Verarbeitet Beep nicht-blockierend
-// Diese Funktion wird von StateMachine aufgerufen, wenn eine
-// Paddel-Taste gedrückt wird. Sie startet den Beep-Ton
-// und speichert das Symbol für die Dekodierung.
+/// ProcessBeep() - Process Beep Non-blockingly
+// Called by StateMachine when paddle button is pressed
+// Starts beep tone and stores symbol for decoding
 /////////////////////////////////////////////////////////////////
 void ProcessBeep(short beepoLength, char outputChar)
 {
-    tone(SPEAKER_PIN, 1000);   // Starte 1000 Hz Ton
+    tone(SPEAKER_PIN, 1000);   // Start 1000 Hz tone
 
-    // Schalte Buzzer ein, wenn aktiviert
+    // Turn on buzzer if enabled
     if(speakerOn) 
     {
         digitalWrite(BUZZER_PIN, HIGH);
     }
 
-    beeping = true;                      // Markiere als aktiv
-    beepEnd = millis() + beepoLength;   // Berechne Endzeit
-    // Pause nach Beep wird automatisch in updateBeep() gestartet
-    DEBUG_PRINT(outputChar);  // Debug-Ausgabe
+    beeping = true;                      // Mark as active
+    beepEnd = millis() + beepoLength;   // Calculate end time
+    // Pause after beep is automatically started in updateBeep()
+    DEBUG_PRINT(outputChar);  // Debug output
 }
 
 /////////////////////////////////////////////////////////////////
-/// ProcessSign() - Spielt ein einzelnes Zeichen als Morse-Code
-// Diese Funktion wird vom Trainer verwendet, um das korrekte
-// Zeichen abzuspielen, wenn der Benutzer einen Fehler macht.
+/// ProcessSign() - Play Single Character as Morse Code
+// Used by trainer to play correct character when user makes mistake
 /////////////////////////////////////////////////////////////////
 void ProcessSign(char sign)
 {
-  // Starte Playback eines einzelnen Zeichens (z.B. 'A' -> ".-")
+  // Start playback of single character (e.g. 'A' -> ".-")
   startPlayback(String(sign));
 }
 
 /////////////////////////////////////////////////////////////////
-/// PlayMemory() - Spielt gespeicherten Text aus EEPROM ab
-// Diese Funktion wird vom CW-Keyer-Menü aufgerufen, wenn der
-// Benutzer einen der beiden Speicher abspielen möchte.
+/// PlayMemory() - Play Stored Text from EEPROM
+// Called by CW Keyer menu when user wants to play one of the
+// two stored text memories
 /////////////////////////////////////////////////////////////////
 void PlayMemory(byte addr)
 {
-  // Lese Text aus EEPROM
+  // Read text from EEPROM
   String text = ReadTextFromEEPROM(addr);
   DEBUG_PRINTLN(text);
 
-  // Sicherheitsprüfung: nur abspielen, wenn Text nicht leer ist
+  // Safety check: only play if text is not empty
   if(text.length() <= 0)
     return;
 
-  // Starte nicht-blockierende Wiedergabe
+  // Start non-blocking playback
   startPlayback(text);
 }
 
 /////////////////////////////////////////////////////////////////
-/// EncodeChar() - Konvertiert Zeichen zu Morse-Code
-// Diese Funktion nimmt einen ASCII-Buchstaben oder Ziffer und
-// gibt den entsprechenden Morse-Code zurück (z.B. 'A' -> ".-").
-// Der Morse-Code ist im PROGMEM gespeichert (Flash-Speicher).
+/// EncodeChar() - Convert Character to Morse Code
+// Takes ASCII letter or digit and returns corresponding Morse code
+// (e.g. 'A' -> ".-")
+// Morse code is stored in PROGMEM (Flash memory)
 /////////////////////////////////////////////////////////////////
 String EncodeChar(char sign)
 {
-  char buffer[6]; // max Morse-Zeichen + null-Terminator (z.B. "-----")
+  char buffer[6]; // Max Morse characters + null terminator (e.g. "-----")
 
-  // ===== Große und kleine Buchstaben =====
+  // ===== Upper and lower case letters =====
   if (sign >= 'a' && sign <= 'z') 
   {
-    strcpy_P(buffer, MORSE_LETTERS[sign - 'a']);  // Lese aus PROGMEM
+    strcpy_P(buffer, MORSE_LETTERS[sign - 'a']);  // Read from PROGMEM
     return String(buffer);
   } 
   else if (sign >= 'A' && sign <= 'Z') 
@@ -1322,52 +1336,52 @@ String EncodeChar(char sign)
     strcpy_P(buffer, MORSE_LETTERS[sign - 'A']);
     return String(buffer);
   } 
-  // ===== Ziffern =====
+  // ===== Digits =====
   else if (sign >= '0' && sign <= '9') 
   {
     strcpy_P(buffer, MORSE_NUMBERS[sign - '0']);
     return String(buffer);
   }
 
-  return "";  // Unbekanntes Zeichen
+  return "";  // Unknown character
 }
 
 /////////////////////////////////////////////////////////////////
-/// DecodeMorseCode() - Konvertiert Morse-Code zu Zeichen
-// Diese Funktion nimmt einen Morse-Code-String (z.B. ".-")
-// und gibt das entsprechende Zeichen zurück (z.B. 'A').
-// Wird vom Monitor und Trainer verwendet.
+/// DecodeMorseCode() - Convert Morse Code to Character
+// Takes Morse code string (e.g. ".-") and returns corresponding
+// character (e.g. 'A')
+// Used by monitor and trainer
 /////////////////////////////////////////////////////////////////
 String DecodeMorseCode(String code) 
 {
-  // ===== Durchsuche alle 26 Buchstaben =====
+  // ===== Search all 26 letters =====
   for (int i = 0; i < 26; i++) 
   {
     char buffer[6];
-    strcpy_P(buffer, MORSE_LETTERS[i]);  // Lese Morse-Code aus PROGMEM
-    if (strcmp(buffer, code.c_str()) == 0)  // Vergleiche mit Eingabe
+    strcpy_P(buffer, MORSE_LETTERS[i]);  // Read Morse code from PROGMEM
+    if (strcmp(buffer, code.c_str()) == 0)  // Compare with input
     {
-      char letterChar = pgm_read_byte(&LETTERS[i]);  // Hole Buchstaben
+      char letterChar = pgm_read_byte(&LETTERS[i]);  // Get letter
       return String(letterChar);
     }
   }
 
-  // ===== Durchsuche alle 10 Ziffern =====
+  // ===== Search all 10 digits =====
   for (int i = 0; i < 10; i++) 
   {
     char buffer[6];
     strcpy_P(buffer, MORSE_NUMBERS[i]);
     if (strcmp(buffer, code.c_str()) == 0)
     {
-      return String(char('0' + i));  // Konvertiere Index zu Ziffer
+      return String(char('0' + i));  // Convert index to digit
     }
   }
 
-  return "*";  // Keine Entsprechung gefunden
+  return "*";  // No match found
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowMainScreen
+/// ShowMainScreen() - Display Main Menu Screen
 /////////////////////////////////////////////////////////////////
 void ShowMainScreen()
 {
@@ -1384,16 +1398,17 @@ void ShowMainScreen()
   display.print("Trainer", 4,4);
   display.print("Setup", 5,4);
 
+  // Show WiFi status if enabled
   if(settingsOn == true)
         display.print("-192.168.4.2-", 6,2);
       else
         display.print("             ", 6,2);
 
-   display.print(">", 2,1);
+   display.print(">", 2,1);  // Selection arrow
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowKeyerScreen
+/// ShowKeyerScreen() - Display CW Keyer Menu Screen
 /////////////////////////////////////////////////////////////////
 void ShowKeyerScreen()
 {
@@ -1408,7 +1423,7 @@ void ShowKeyerScreen()
   display.print("Speed", 4,4);
   display.print("Back", 5,4);
 
-  display.print(">", 2,1);
+  display.print(">", 2,1);  // Selection arrow
 
   char string[20];
   snprintf(string, sizeof(string), "Speed: %i WPM", wpm);
@@ -1416,7 +1431,7 @@ void ShowKeyerScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowTrainerScreen
+/// ShowTrainerScreen() - Display Trainer Mode Menu Screen
 /////////////////////////////////////////////////////////////////
 void ShowTrainerScreen()
 {
@@ -1432,11 +1447,12 @@ void ShowTrainerScreen()
 
   display.print("Back", 6,4);
 
-  display.print(">", 2,1);
+  display.print(">", 2,1);  // Selection arrow
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowTrainerHearScreen
+/// ShowTrainerHearScreen() - Display Trainer Hear Mode
+// Shows random letters and plays them for user to listen
 /////////////////////////////////////////////////////////////////
 void ShowTrainerHearScreen()
 {
@@ -1444,15 +1460,16 @@ void ShowTrainerHearScreen()
   selected_menu_item = 1;
   display.clear();
 
-  // Zufälligen Buchstaben aus aktiver Liste wählen
+  // Select random letter from active list
   if (selectedLetters.length() == 0) 
   {
-    // Fallback: alle Buchstaben
+    // Fallback: all letters
     selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   } 
 
   char buf[6];
 
+  // Generate 5 random letters
   for(int i=0; i<5; i++)
   {
     int idx = random(0, selectedLetters.length());
@@ -1464,11 +1481,12 @@ void ShowTrainerHearScreen()
   startPlayback(String(buf));
   display.print(buf, 4, 5);
 
-  decoderString = "";
+  decoderString = "";  // Clear decoder buffer
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowTrainerListenRepeatScreen
+/// ShowTrainerListenRepeatScreen() - Display Trainer Listen & Repeat Mode
+// Shows a single letter, plays it, and user must repeat by keying
 /////////////////////////////////////////////////////////////////
 void ShowTrainerListenRepeatScreen()
 {
@@ -1476,12 +1494,13 @@ void ShowTrainerListenRepeatScreen()
   selected_menu_item = 1;
   display.clear();
 
-  // Zufälligen Buchstaben aus aktiver Liste wählen
+  // Select random letter from active list
   if (selectedLetters.length() == 0) 
   {
-    // Fallback: alle Buchstaben
+    // Fallback: all letters
     selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   }
+  
   int idx = random(0, selectedLetters.length());
   char letter = selectedLetters[idx];
   currentTrainerLetter = letter;
@@ -1489,18 +1508,19 @@ void ShowTrainerListenRepeatScreen()
   char buf[2] = { currentTrainerLetter, '\0' };
   display.print(buf, 4, 7);
 
-  startPlayback(String(buf));
+  startPlayback(String(buf));  // Play the letter
 
   DEBUG_PRINT("SelectedLetters: ");
   DEBUG_PRINTLN(selectedLetters);
   DEBUG_PRINT("CurrentTrainerLetter: ");
   DEBUG_PRINTLN(currentTrainerLetter);
 
-  decoderString = "";
+  decoderString = "";  // Clear decoder buffer
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowTrainerGiveRandomScreen
+/// ShowTrainerGiveRandomScreen() - Display Trainer Give Random Mode
+// Shows random letter and user must key the Morse code for it
 /////////////////////////////////////////////////////////////////
 void ShowTrainerGiveRandomScreen()
 {
@@ -1508,29 +1528,31 @@ void ShowTrainerGiveRandomScreen()
   selected_menu_item = 1;
   display.clear();
 
-  // Zufälligen Buchstaben aus aktiver Liste wählen
+  // Select random letter from active list
   if (selectedLetters.length() == 0) 
   {
-    // Fallback: alle Buchstaben
+    // Fallback: all letters
     selectedLetters ="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   }
+  
   int idx = random(0, selectedLetters.length());
   char letter = selectedLetters[idx];
   currentTrainerLetter = letter;
 
   char buf[2] = { currentTrainerLetter, '\0' };
-  display.print(buf, 4, 7);
+  display.print(buf, 4, 7);  // Display target letter
 
   DEBUG_PRINT("SelectedLetters: ");
   DEBUG_PRINTLN(selectedLetters);
   DEBUG_PRINT("CurrentTrainerLetter: ");
   DEBUG_PRINTLN(currentTrainerLetter);
 
-  decoderString = "";
+  decoderString = "";  // Clear decoder buffer
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowTrainerGiveAZScreen
+/// ShowTrainerGiveAZScreen() - Display Trainer Give A-Z Mode
+// Shows letters sequentially A-Z and user must key the Morse code
 /////////////////////////////////////////////////////////////////
 void ShowTrainerGiveAZScreen()
 {
@@ -1541,22 +1563,22 @@ void ShowTrainerGiveAZScreen()
   currentAZPosition++;
 
   if(currentAZPosition > 25)
-    currentAZPosition = 0;
+    currentAZPosition = 0;  // Loop back to 'A'
 
   char letter = selectedLetters[currentAZPosition];
   currentTrainerLetter = letter;
 
   char buf[2] = { currentTrainerLetter, '\0' };
-  display.print(buf, 4, 7);
+  display.print(buf, 4, 7);  // Display target letter
 
   DEBUG_PRINT("CurrentTrainerLetter: ");
   DEBUG_PRINTLN(currentTrainerLetter);
 
-  decoderString = "";
+  decoderString = "";  // Clear decoder buffer
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowSetupScreen
+/// ShowSetupScreen() - Display Setup/Configuration Screen
 /////////////////////////////////////////////////////////////////
 void ShowSetupScreen()
 {
@@ -1565,15 +1587,18 @@ void ShowSetupScreen()
   
   display.clear();
     
+  // Display speaker status
   if(speakerOn == true)
     display.print("Speaker ON  ", 2,4);
   else
     display.print("Speaker OFF", 2,4);
 
+  // Display settings status
   if(settingsOn == true)
     display.print("Settings ON  ", 3,4);
   else
     display.print("Settings OFF", 3,4);
+    
   display.print("Farnsworth", 4,4);
 
   char string[20];
@@ -1581,11 +1606,11 @@ void ShowSetupScreen()
   display.print(string, 6,2);
 
   display.print("Back", 5,4);
-  display.print(">", 2,1);
+  display.print(">", 2,1);  // Selection arrow
 }
 
 /////////////////////////////////////////////////////////////////
-// ShowMonitorScreen
+/// ShowMonitorScreen() - Display Morse Monitor (Decoder) Screen
 /////////////////////////////////////////////////////////////////
 void ShowMonitorScreen()
 {
@@ -1594,7 +1619,7 @@ void ShowMonitorScreen()
   char_on_screen = 0;
   display.clear();
 
-  // WICHTIG: Deaktiviere Webserver für optimale Timing
+  // IMPORTANT: Disable web server for optimal timing
   if(settingsOn == true)
   {
     DEBUG_PRINTLN("Disabling WiFi for Monitor Mode");
@@ -1603,33 +1628,35 @@ void ShowMonitorScreen()
 }
 
 /////////////////////////////////////////////////////////////////
-// CalculateTimes
+/// CalculateTimes() - Calculate Morse Timing Constants
+// Calculates timing based on WPM (words per minute)
+// Supports Farnsworth timing for slow-speed training
 /////////////////////////////////////////////////////////////////
 void CalculateTimes(char wpm, char fwpm)
 {
   if (wpm <= 0) 
     wpm = 1;
   if (fwpm > wpm) 
-    fwpm = wpm;  // Farnsworth darf nicht schneller sein
+    fwpm = wpm;  // Farnsworth must not be faster than regular WPM
 
-  unsigned int T = 1200 / wpm;    // Basis-Zeit (Elementlänge)
-  unsigned int Tfw = 1200 / fwpm; // Farnsworth-Basis (verlängerte Pausen)
+  unsigned int T = 1200 / wpm;    // Basic time unit (element length)
+  unsigned int Tfw = 1200 / fwpm; // Farnsworth basis (extended pauses)
 
-  // ===== Berechne globale Timing-Konstanten =====
-  T_unit    = T;                // Speichere Basis-Zeit für Referenz
-  dit_len   = T;                // Punkt = 1T
-  dah_len   = 3 * T;            // Strich = 3T
-  elementGap = T;               // Pause zwischen Punkt/Strich = 1T
+  // ===== Calculate global timing constants =====
+  T_unit    = T;                // Store basic time for reference
+  dit_len   = T;                // Dot = 1T
+  dah_len   = 3 * T;            // Dash = 3T
+  elementGap = T;               // Pause between dot/dash = 1T
 
-  // ===== Farnsworth-Pausen (verlängert) =====
-  // Buchstabenpause: Total 3T nach Farnsworth
-  // Da 1T (elementGap) nach dem letzten Element bereits gezählt wird,
-  // addieren wir nur die Differenz (2T extra)
-  letterExtra = (3 * Tfw) - elementGap;  // Zusätzliche Pause nach Buchstabe
+  // ===== Farnsworth Pauses (extended) =====
+  // Letter pause: Total 3T in Farnsworth
+  // Since 1T (elementGap) after last element is already counted,
+  // we only add the difference (2T extra)
+  letterExtra = (3 * Tfw) - elementGap;  // Extra pause after letter
 
-  // Wortpause: Total 7T nach Farnsworth
-  // Da 1T (elementGap) bereits gezählt wird, addieren wir die Differenz (6T extra)
-  wordExtra = (7 * Tfw) - elementGap;    // Zusätzliche Pause nach Wort
+  // Word pause: Total 7T in Farnsworth
+  // Since 1T (elementGap) is already counted, add difference (6T extra)
+  wordExtra = (7 * Tfw) - elementGap;    // Extra pause after word
 
   DEBUG_PRINT("T: "); DEBUG_PRINTLN(T);
   DEBUG_PRINT("Tfw: "); DEBUG_PRINTLN(Tfw);
@@ -1641,123 +1668,122 @@ void CalculateTimes(char wpm, char fwpm)
 }
 
 /////////////////////////////////////////////////////////////////
-/// WriteTextToEEPROM() - Speichert einen Text im EEPROM
-// Diese Funktion schreibt einen String ab einer bestimmten Adresse
-// ins EEPROM des ESP8266. Der String wird null-terminiert, um sein
-// Ende zu markieren (Standard C-String-Konvention).
-// Restlicher Speicher wird mit '@' gefüllt (Padding).
+/// WriteTextToEEPROM() - Save Text String to EEPROM
+// Writes a string starting at specified address to EEPROM
+// String is null-terminated to mark end (standard C convention)
+// Remaining memory is filled with '@' as padding marker
 /////////////////////////////////////////////////////////////////
 void WriteTextToEEPROM(byte addr, String text)
 {
-  // Schreibe jeden Buchstaben des Strings
+  // Write each character of the string
   for (int i = 0; i < text.length(); i++)
   {
-    EEPROM.write(addr, text[i]);  // Schreibe Zeichen
-    addr += 1;                      // Nächste EEPROM-Adresse
+    EEPROM.write(addr, text[i]);  // Write character
+    addr += 1;                      // Next EEPROM address
   }
-  EEPROM.write(addr, 0);           // Nullterminator schreiben (String-Ende)
+  EEPROM.write(addr, 0);           // Write null terminator (string end)
   addr += 1;
 
-  // Optionales Padding: Rest mit '@' auffüllen (Erkennungsmarker)
-  // Dies verhindert, dass alte Daten beim Lesen angehängt werden
+  // Optional padding: Fill rest with '@' (recognition marker)
+  // Prevents old data from being appended when reading
   for (int i = addr; i < 128; i++)
   {
     EEPROM.write(i, '@');
   }
-  EEPROM.commit();  // Schreibe alle Änderungen in EEPROM
+  EEPROM.commit();  // Write all changes to EEPROM
 }
 
 /////////////////////////////////////////////////////////////////
-/// ReadTextFromEEPROM() - Liest einen Text aus dem EEPROM
-// Diese Funktion liest ab einer EEPROM-Adresse, bis ein
-// Nullterminator (0x00) oder ein Padding-Zeichen ('@') gefunden wird.
-// Gibt den gelesenen String zurück.
+/// ReadTextFromEEPROM() - Read Text String from EEPROM
+// Reads from specified EEPROM address until null terminator (0x00)
+// or padding character ('@') is found
+// Returns the read string
 /////////////////////////////////////////////////////////////////
 String ReadTextFromEEPROM(byte addr)
 {
-  String retVal;  // Ergebnis-String
-  for (int i = addr; i < 128; i++)   // Lese bis zur EEPROM-Grenze
+  String retVal;  // Result string
+  
+  for (int i = addr; i < 128; i++)   // Read until EEPROM boundary
   {
-    byte readValue = EEPROM.read(i);  // Lese Byte aus EEPROM
-    if (readValue == 0)               // Nullterminator = String-Ende
+    byte readValue = EEPROM.read(i);  // Read byte from EEPROM
+    if (readValue == 0)               // Null terminator = string end
       break;
     char readValueChar = char(readValue);
-    if(readValueChar != '@')          // Ignoriere Padding-Zeichen
-      retVal += readValueChar;        // Hänge Zeichen an String
+    if(readValueChar != '@')          // Ignore padding characters
+      retVal += readValueChar;        // Append character to string
   }
-  DEBUG_PRINTLN(retVal);  // Debug-Ausgabe
+  DEBUG_PRINTLN(retVal);  // Debug output
   return retVal;
 }
 
 /////////////////////////////////////////////////////////////////
-/// DisplaySelectionArrow() - Zeigt Menü-Auswahlpfeil an
-// Diese Funktion entfernt den alten Pfeil und platziert ihn
-// an der Position des aktuellen Menü-Elements. Dies ermöglicht
-// eine visuelle Navigation durch die Menü-Optionen.
+/// DisplaySelectionArrow() - Display Menu Selection Arrow
+// Removes old arrow and places it at position of current menu item
+// Enables visual navigation through menu options
 /////////////////////////////////////////////////////////////////
 void DisplaySelectionArrow()
 {
-  // Entferne Pfeil von allen möglichen Positionen (Zeilen 2-6)
+  // Remove arrow from all possible positions (rows 2-6)
   display.print(" ", 2,1);
   display.print(" ", 3,1);
   display.print(" ", 4,1);
   display.print(" ", 5,1);
   display.print(" ", 6,1);
 
-  // Platziere Pfeil an der aktuellen Menü-Position
-  // (selected_menu_item + 1, da Menü-Items bei 1 anfangen, aber Display-Zeilen bei 0)
+  // Place arrow at current menu position
+  // (selected_menu_item + 1, since menu items start at 1 but display rows at 0)
   display.print(">", selected_menu_item+1, 1);
 }
 
 /////////////////////////////////////////////////////////////////
-/// rotate() - Rotary Encoder Drehung verarbeiten
-// Diese Funktion wird jedes Mal aufgerufen, wenn der Encoder
-// gedreht wird. Je nach aktuellem Menü:
-// - Im CW_KEYER Menü: Ändert die Geschwindigkeit (WPM) wenn speed_mode=true
-// - Im SETUP Menü: Ändert die Farnsworth-Geschwindigkeit wenn fspeed_mode=true
-// - In anderen Menüs: Navigiert durch Menü-Optionen
+/// rotate() - Handle Rotary Encoder Rotation
+// Called each time encoder is rotated
+// Behavior depends on current menu:
+// - CW_KEYER menu: Changes speed (WPM) if speed_mode=true
+// - SETUP menu: Changes Farnsworth speed if fspeed_mode=true
+// - Other menus: Navigate through menu options
 /////////////////////////////////////////////////////////////////
 void rotate(Rotary& r) 
 {
-  // ===== Geschwindigkeit einstellen im Keyer-Menü =====
+  // ===== Set Speed in Keyer Menu =====
   if(actual_menu == CW_KEYER && speed_mode == true)
   {
-    // Erhöhe oder senke WPM basierend auf Encoder-Richtung
-    if(r.getDirection() == 1)      // Drehung rechts = höhere Geschwindigkeit
+    // Increase or decrease WPM based on encoder direction
+    if(r.getDirection() == 1)      // Turn right = higher speed
     {
-         wpm += STEP_SIZE;  // Erhöhe um STEP_SIZE (z.B. 5 WPM)
+         wpm += STEP_SIZE;  // Increase by STEP_SIZE (e.g. 5 WPM)
     }
-    else                             // Drehung links = niedrigere Geschwindigkeit
+    else                             // Turn left = lower speed
     {
       if(wpm > 0)
       {
-        wpm -= STEP_SIZE;   // Senke um STEP_SIZE
+        wpm -= STEP_SIZE;   // Decrease by STEP_SIZE
       }
     }
 
-    fwpm = wpm;
+    fwpm = wpm;  // Keep Farnsworth speed in sync
 
-    // Aktualisiere Display mit neuer WPM
+    // Update display with new WPM
     char string[20];
     snprintf(string, sizeof(string), "Speed: %i WPM", wpm);
     display.print(string, 6,2);
 
-    CalculateTimes(wpm, fwpm);  // Neuberechnung aller Timings
-    EEPROM.write(EEPROM_WPM_ADDR, wpm);  // Speichere in EEPROM
+    CalculateTimes(wpm, fwpm);  // Recalculate all timing
+    EEPROM.write(EEPROM_WPM_ADDR, wpm);  // Save to EEPROM
     EEPROM.commit();
     return;
   }
 
-  // ===== Farnsworth-Geschwindigkeit im Setup-Menü =====
+  // ===== Set Farnsworth Speed in Setup Menu =====
   if(actual_menu == SETUP && fspeed_mode == true)
   {
-    if(r.getDirection() == 1)       // Drehung rechts
+    if(r.getDirection() == 1)       // Turn right
     {
          fwpm += STEP_SIZE;
     }
-    else                             // Drehung links
+    else                             // Turn left
     {
-      if(wpm > 0)  // Prüfe normale WPM, nicht fwpm (Bug?)
+      if(wpm > 0)  // Check regular WPM, not fwpm (possible bug?)
       {
         fwpm -= STEP_SIZE;
       }
@@ -1767,95 +1793,94 @@ void rotate(Rotary& r)
     snprintf(string, sizeof(string), "FW: %i WPM", fwpm);
     display.print(string, 6,2);
 
-    CalculateTimes(wpm, fwpm);  // Neuberechnung aller Timings
-    EEPROM.write(EEPROM_FWPM_ADDR, fwpm);  // Speichere in EEPROM
+    CalculateTimes(wpm, fwpm);  // Recalculate all timing
+    EEPROM.write(EEPROM_FWPM_ADDR, fwpm);  // Save to EEPROM
     EEPROM.commit();
-    return;
-  }  // ===== Menü-Navigation =====
-  // Im Keyer-Menü nach oben/unten navigieren
-  if(actual_menu == CW_KEYER)
-  {
-    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
-    {
-      selected_menu_item++;  // Zum nächsten Menü-Element
-
-      if(selected_menu_item > KEYER_MENU_COUNT)  // Zyklisch: Wenn am Ende, gehe zum Anfang
-        selected_menu_item = 1;
-    }
-    else                         // Drehung links = Menü nach oben
-    {
-      selected_menu_item--;
-      if(selected_menu_item < 1)
-        selected_menu_item = KEYER_MENU_COUNT;  // Zyklisch
-    }
-
-    DisplaySelectionArrow();  // Zeige neue Position an
     return;
   }
 
-  // Im Haupt-Menü (bietet Zirkulation in beide Richtungen)
+  // ===== Menu Navigation =====
+  // Navigate in Keyer menu up/down
+  if(actual_menu == CW_KEYER)
+  {
+    if(r.getDirection() == 1)  // Turn right = menu down
+    {
+      selected_menu_item++;  // Move to next menu item
+
+      if(selected_menu_item > KEYER_MENU_COUNT)  // Wrap: if at end, go to start
+        selected_menu_item = 1;
+    }
+    else                         // Turn left = menu up
+    {
+      selected_menu_item--;
+      if(selected_menu_item < 1)
+        selected_menu_item = KEYER_MENU_COUNT;  // Wrap
+    }
+
+    DisplaySelectionArrow();  // Show new position
+    return;
+  }
+
+  // Navigate in main menu (wraps in both directions)
   if(actual_menu == MAIN_MENU)
   {
-    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
+    if(r.getDirection() == 1)  // Turn right = menu down
     {
       selected_menu_item++;
 
       if(selected_menu_item > MAIN_MENU_COUNT)
-        selected_menu_item = 1;  // Zyklisch
+        selected_menu_item = 1;  // Wrap
     }
-    else                         // Drehung links = Menü nach oben
+    else                         // Turn left = menu up
     {
       selected_menu_item--;
       if(selected_menu_item < 1)
-        selected_menu_item = MAIN_MENU_COUNT;  // Zyklisch
+        selected_menu_item = MAIN_MENU_COUNT;  // Wrap
     }
 
     DisplaySelectionArrow();
-
     return;
   }
 
-  // Im Setup-Menü navigieren
+  // Navigate in Setup menu
   if(actual_menu == SETUP)
   {
-    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
+    if(r.getDirection() == 1)  // Turn right = menu down
     {
       selected_menu_item++;
 
       if(selected_menu_item > SETUP_MENU_COUNT)
         selected_menu_item = 1;
     }
-    else                         // Drehung links = Menü nach oben
+    else                         // Turn left = menu up
     {
       selected_menu_item--;
       if(selected_menu_item < 1)
-        selected_menu_item = SETUP_MENU_COUNT;  // Zyklisch
+        selected_menu_item = SETUP_MENU_COUNT;  // Wrap
     }
 
     DisplaySelectionArrow();
-
     return;
   }
 
-  // Im Trainer-Menü navigieren
+  // Navigate in Trainer menu
   if(actual_menu == TRAINER)
   {
-    if(r.getDirection() == 1)  // Drehung rechts = Menü nach unten
+    if(r.getDirection() == 1)  // Turn right = menu down
     {
       selected_menu_item++;
 
       if(selected_menu_item > TRAINER_MENU_COUNT)
         selected_menu_item = 1;
     }
-    else                         // Drehung links = Menü nach oben
+    else                         // Turn left = menu up
     {
       selected_menu_item--;
       if(selected_menu_item < 1)
-        selected_menu_item = TRAINER_MENU_COUNT;  // Zyklisch
+        selected_menu_item = TRAINER_MENU_COUNT;  // Wrap
     }
 
     DisplaySelectionArrow();
-
     return;
   }
 }
