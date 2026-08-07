@@ -4,7 +4,7 @@
 # eMail=
 #
 # Project=CWKeyer
-# Date=12:56:05
+# Date=14:59:32
 # CreatedBy=Fritzing 1.0.4.2024-10-07.CD-2088-0-a8c6ef7c
 #
 #
@@ -14,16 +14,16 @@
 #
 RefDes,Description,Package,X,Y,Rotation,Side,Mount
 Description: resistance;capacitance;inductance;voltage;current;power;mpn;mn;
-Enc,";;;;;;;;","THT",2958.26,1639.66,0,Top,THT
-Battery,";;;;;;;;","THT",1408.26,439.661,-90,Top,THT
-Display,";;;;;;;;","THT",2008.26,439.661,90,Top,THT
-J2,";;;;;;;;","THT",158.259,1339.66,0,Top,THT
-R1,"10k;;;;;0.25W;;;","THT",458.259,1839.66,-90,Top,THT
-Spk,";;;;;;;;","THT",2958.26,2039.66,0,Top,THT
-Volume,";;;;;0.5W;;;","THT",1952.26,2039.66,0,Top,THT
-C1,";100nF;;35V;;;;;","100 mil [THT, multilayer]",558.259,1989.48,-90,Top,THT
-Buzz,";;;;;;;;","",2958.26,1289.66,0,Top,MANUAL
-R2,"10k;;;;;0.25W;;;","THT",358.259,1839.66,90,Top,THT
-Key,";;;;;;;;","THT",2958.26,1039.66,0,Top,THT
-In,";;;;;;;;","THT",2958.26,789.661,0,Top,THT
-J1,";;;;;;;;","THT",1058.26,1339.66,180,Top,THT
+Volume,";;;;;0.5W;;;","THT",1682.9,2029.74,0,Top,THT
+J1,";;;;;;;;","THT",1076.9,1328.17,180,Top,THT
+Spk,";;;;;;;;","THT",2976.9,2028.17,0,Top,THT
+Display,";;;;;;;;","THT",2026.9,428.17,90,Top,THT
+Buzzer,";;;;;;;;","buzzer-12mm",2276.9,2056.12,90,Top,SMT
+Enc,";;;;;;;;","THT",2976.9,1628.17,0,Top,THT
+Battery,";;;;;;;;","THT",1426.9,428.17,-90,Top,THT
+Key,";;;;;;;;","THT",2976.9,1228.17,0,Top,THT
+C1,";100nF;;35V;;;;;","100 mil [THT, multilayer]",576.903,1977.98,-90,Top,THT
+R2,"10k;;;;;0.25W;;;","THT",376.903,1828.17,90,Top,THT
+In,";;;;;;;;","THT",2976.9,878.17,0,Top,THT
+R1,"10k;;;;;0.25W;;;","THT",476.903,1828.17,-90,Top,THT
+J2,";;;;;;;;","THT",176.903,1328.17,0,Top,THT
