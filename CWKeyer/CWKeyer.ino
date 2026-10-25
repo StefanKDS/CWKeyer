@@ -1482,12 +1482,13 @@ void ShowTrainerHearScreen()
   } 
 
   char buf[6];
+  char letter;
 
   // Generate 5 random letters
   for(int i=0; i<5; i++)
   {
     int idx = random(0, selectedLetters.length());
-    char letter = selectedLetters[idx];
+    letter = selectedLetters[idx];
     buf[i] = letter;
   }
 
@@ -1520,7 +1521,7 @@ void ShowTrainerListenRepeatScreen()
   currentTrainerLetter = letter;
 
   char buf[2] = { currentTrainerLetter, '\0' };
-  display.print(buf, 4, 7);
+  display.printChar16(currentTrainerLetter, 3, 7);
 
   startPlayback(String(buf));  // Play the letter
 
@@ -1553,8 +1554,7 @@ void ShowTrainerGiveRandomScreen()
   char letter = selectedLetters[idx];
   currentTrainerLetter = letter;
 
-  char buf[2] = { currentTrainerLetter, '\0' };
-  display.print(buf, 4, 7);  // Display target letter
+  display.printChar16(currentTrainerLetter, 3, 7);
 
   DEBUG_PRINT("SelectedLetters: ");
   DEBUG_PRINTLN(selectedLetters);
@@ -1582,8 +1582,7 @@ void ShowTrainerGiveAZScreen()
   char letter = selectedLetters[currentAZPosition];
   currentTrainerLetter = letter;
 
-  char buf[2] = { currentTrainerLetter, '\0' };
-  display.print(buf, 4, 7);  // Display target letter
+  display.printChar16(currentTrainerLetter, 3, 7);
 
   DEBUG_PRINT("CurrentTrainerLetter: ");
   DEBUG_PRINTLN(currentTrainerLetter);

@@ -15,6 +15,7 @@ class OLED {
     void off(void);
     void clear(void);
     void print(const char *s, uint8_t r=0, uint8_t c=0);
+    void printChar16(char s, int r=0, int c=0);
 
   private:
     uint8_t _sda, _scl, _address, _offset;
@@ -28,6 +29,7 @@ class OLED {
     void setXY(unsigned char row,unsigned char col);
     void sendStr(unsigned char *string);
     void sendStrXY( const char *string, int X, int Y);
+    void sendCharXY16(char c, int X, int Y);
     void init_OLED(void);
 };
 

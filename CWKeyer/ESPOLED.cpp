@@ -179,6 +179,72 @@ void OLED::sendCharXY(unsigned char data, int X, int Y)
   Wire.endTransmission();    // stop transmitting
 }
 
+
+
+void OLED::sendCharXY16(char c, int X, int Y)
+{
+    uint8_t ch = (uint8_t)c;
+
+    if (ch < 0x20 || ch > 0x7E)
+        return;
+
+    // X = obere Display-Page (0 bis 6)
+    // Y = Spaltenposition in 8-Pixel-Schritten (0 bis 14)
+    if (X < 0 || X > 6 || Y < 0 || Y > 14)
+        return;
+
+    uint8_t fontIndex = ch - 0x20;
+    uint8_t top[16];
+    uint8_t bottom[16];
+
+    // Aus 8x8 wird 16x16:
+    // Jedes Pixel wird horizontal und vertikal verdoppelt.
+    for (uint8_t col = 0; col < 8; col++)
+    {
+        uint8_t bits = pgm_read_byte(&myFont[fontIndex][col]);
+        uint16_t expanded = 0;
+
+        for (uint8_t row = 0; row < 8; row++)
+        {
+            if (bits & (1U << row))
+                expanded |= (uint16_t)3 << (row * 2);
+        }
+
+        top[col * 2]       = expanded & 0xFF;
+        top[col * 2 + 1]   = expanded & 0xFF;
+        bottom[col * 2]    = (expanded >> 8) & 0xFF;
+        bottom[col * 2 + 1]= (expanded >> 8) & 0xFF;
+    }
+
+    // Y ist eine 8-Pixel-Spaltenposition.
+    // Für die tatsächliche Pixeladresse mit 8 multiplizieren.
+    uint8_t pixelCol = Y * 8 + _offset;
+
+    // Obere 8 Pixel des Zeichens schreiben
+    sendcommand(0xB0 + X);
+    sendcommand(pixelCol & 0x0F);
+    sendcommand(0x10 | ((pixelCol >> 4) & 0x0F));
+
+    Wire.beginTransmission(_address);
+    Wire.write(0x40);
+    for (uint8_t i = 0; i < 16; i++)
+        Wire.write(top[i]);
+    Wire.endTransmission();
+
+    // Untere 8 Pixel des Zeichens schreiben
+    sendcommand(0xB0 + X + 1);
+    sendcommand(pixelCol & 0x0F);
+    sendcommand(0x10 | ((pixelCol >> 4) & 0x0F));
+
+    Wire.beginTransmission(_address);
+    Wire.write(0x40);
+    for (uint8_t i = 0; i < 16; i++)
+        Wire.write(bottom[i]);
+    Wire.endTransmission();
+}
+
+
+
 //==========================================================//
 // Used to send commands to the display.
 void OLED::sendcommand(unsigned char com)
@@ -260,7 +326,6 @@ void OLED::sendStrXY(const char *string, int X, int Y)
     }
 }
 
-
 //==========================================================//
 // Inits oled and draws logo at startup
 void OLED::init_OLED(void)
@@ -335,6 +400,10 @@ void OLED::clear(void) {
   clear_display();
 }
 
+void OLED::printChar16(char s, int r, int c) {
+  sendCharXY16(s, r, c);
+}
+
 void OLED::print(const char *s, uint8_t r, uint8_t c) {
-  sendStrXY(s, r, c);
+    sendStrXY(s, r, c);
 }
