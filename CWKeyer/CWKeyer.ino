@@ -786,72 +786,86 @@ void loop()
     }
 
     // ===== Keyer Input (Paddles) =====
-    bool dit = digitalRead(KEYER_SHORT_PIN) == LOW;  // Dot paddle pressed
-    bool dah = digitalRead(KEYER_LONG_PIN) == LOW;   // Dash paddle pressed
+    // Paddle-Eingaenge entprellen: Rohpegel muss 20 ms stabil sein,
+    // bevor eine neue Betätigung erkannt wird. Ohne Entprellung kann
+    // Kontaktprellen mehrere Dit/Dah-Ereignisse aus einem Tipp erzeugen.
+    bool rawDit = (digitalRead(KEYER_SHORT_PIN) == LOW);
+    bool rawDah = (digitalRead(KEYER_LONG_PIN) == LOW);
 
+    static bool stableDit = false;
+    static bool stableDah = false;
+    static bool previousRawDit = false;
+    static bool previousRawDah = false;
+    static unsigned long ditChangeTime = 0;
+    static unsigned long dahChangeTime = 0;
     static bool lastWasDit = false;
-    static bool iambicModeActive = false;
+    static bool pendingDit = false;
+    static bool pendingDah = false;
 
-    // Only process if no beep or pause is running
+    unsigned long inputNow = millis();
+    if (rawDit != previousRawDit) {
+        previousRawDit = rawDit;
+        ditChangeTime = inputNow;
+    }
+    if (rawDah != previousRawDah) {
+        previousRawDah = rawDah;
+        dahChangeTime = inputNow;
+    }
+
+    bool newDitPress = false;
+    bool newDahPress = false;
+    if (rawDit != stableDit && (unsigned long)(inputNow - ditChangeTime) >= 20) {
+        stableDit = rawDit;
+        newDitPress = stableDit;  // nur stabile Druck-Flanke, nicht Loslassen
+    }
+    if (rawDah != stableDah && (unsigned long)(inputNow - dahChangeTime) >= 20) {
+        stableDah = rawDah;
+        newDahPress = stableDah;  // nur stabile Druck-Flanke, nicht Loslassen
+    }
+
+    if(newDitPress) pendingDit = true;
+    if(newDahPress) pendingDah = true;
+
+    // Gespeicherte kurze Tastendruecke erst nach Ton UND normaler
+    // Elementpause senden. Ein gehaltenes Paddle (stableDit/stableDah)
+    // wird ebenfalls beruecksichtigt und dadurch nach jeder Elementpause
+    // wiederholt. Kurze Taps bleiben ueber pendingDit/pendingDah gespeichert.
+    bool wantDit = pendingDit || stableDit;
+    bool wantDah = pendingDah || stableDah;
+
     if(!beeping && !inPause)
     {
-        // ===== IAMBIC Mode A: Both paddles pressed =====
-        if(dit && dah)
+        if(wantDit && wantDah)
         {
-            iambicModeActive = true;
-
+            // Bei beiden aktiven Paddles abwechseln.
             if(lastWasDit)
             {
                 StateMachine(KEYER_LONG_PIN);
+                pendingDah = false;
                 lastWasDit = false;
             }
             else
             {
                 StateMachine(KEYER_SHORT_PIN);
+                pendingDit = false;
                 lastWasDit = true;
             }
-
             lastKeyTime = millis();
             letterProcessed = false;
         }
-
-        // ===== Single Dot =====
-        else if(dit && !iambicModeActive)
+        else if(wantDit)
         {
             StateMachine(KEYER_SHORT_PIN);
+            pendingDit = false;
             lastWasDit = true;
-
             lastKeyTime = millis();
             letterProcessed = false;
         }
-
-        // ===== Single Dash =====
-        else if(dah && !iambicModeActive)
+        else if(wantDah)
         {
             StateMachine(KEYER_LONG_PIN);
+            pendingDah = false;
             lastWasDit = false;
-
-            lastKeyTime = millis();
-            letterProcessed = false;
-        }
-
-        // ===== IAMBIC Mode B: Last impulse =====
-        else if(iambicModeActive)
-        {
-            iambicModeActive = false;
-
-            // Last opposite tone
-            if(lastWasDit)
-            {
-                StateMachine(KEYER_LONG_PIN);
-                lastWasDit = false;
-            }
-            else
-            {
-                StateMachine(KEYER_SHORT_PIN);
-                lastWasDit = true;
-            }
-
             lastKeyTime = millis();
             letterProcessed = false;
         }
@@ -1884,3 +1898,4 @@ void rotate(Rotary& r)
     return;
   }
 }
+
