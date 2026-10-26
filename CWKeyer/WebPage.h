@@ -108,10 +108,9 @@ const char index_html[] PROGMEM = R"rawliteral(
       </label>
       <input type="submit" value="Save 2">
     </form>
-    <h2>Trainer characters</h2>
-    <p>Choose characters for random sending and listening practice. Word practice uses matching CW words and callsigns.</p>
+    <h2>Trainer Letters</h2>
     <form action="/save_letters" method="get">
-      %TRAINER_CHARACTERS%
+      %LETTERS_CHECKBOXES%
       <br>
       <input type="submit" value="Save">
     </form>

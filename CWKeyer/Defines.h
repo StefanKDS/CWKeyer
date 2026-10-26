@@ -1,7 +1,7 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
-#define VERSION "0.71"
+#define VERSION "0.68"
 
 #define ROTARY_PIN1 2 //D4
 #define ROTARY_PIN2 0 //D3
@@ -21,16 +21,12 @@
 #define SERIAL_SPEED    115200
 
 // EEPROM //////////////
-#define EEPROM_SIZE     261
+#define EEPROM_SIZE     260
 #define EEPROM_WPM_ADDR 0   // 1 byte
 #define EEPROM_MEM1_ADDR 1  // 128 byte
 #define EEPROM_MEM2_ADDR 129   // 128 byte
 #define EEPROM_SPEAKER_ADDR 258 // 1 byte
 #define EEPROM_FWPM_ADDR 259 // 1 byte
-#define EEPROM_TRAINER_START_WPM_ADDR 260 // 1 byte
-#define TRAINER_MIN_WPM 10
-#define TRAINER_MAX_WPM 60
-#define TRAINER_WPM_STEP 2
 ///////////////////////
 
 // STATES ///////////////
