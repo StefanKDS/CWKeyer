@@ -1,0 +1,117 @@
+/////////////////////////////////////////////////////////////////
+/// notFound() - HTTP 404 Handler
+// Sends a 404 error page when client requests non-existent path
+/////////////////////////////////////////////////////////////////
+void notFound() 
+{
+  server.send(404, "text/html", wrapInPage("<p>Page not found</p>"));
+}
+
+/////////////////////////////////////////////////////////////////
+/// handleRoot() - HTTP GET / (Main Page)
+// Serves the HTML page when a client calls the root URL
+// Loads stored texts and checks which letters are selected for training
+/////////////////////////////////////////////////////////////////
+void handleRoot() 
+{
+  String page = index_html;  // Load HTML template
+  
+  // Read stored texts from EEPROM
+  String text1 = ReadTextFromEEPROM(EEPROM_MEM1_ADDR);
+  String text2 = ReadTextFromEEPROM(EEPROM_MEM2_ADDR);
+
+  // Replace placeholders in HTML template with current values
+  page.replace("%TEXT1%", text1);
+  page.replace("%TEXT2%", text2);
+  page.replace("%LETTERS_CHECKBOXES%", generateLetterCheckboxes());
+
+  // Send cache control header (prevents old versions on Android)
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+  // Send HTML page to client
+  server.send(200, "text/html", page);
+}
+
+/////////////////////////////////////////////////////////////////
+/// handleSaveLetters() - HTTP POST /save_letters
+// Processes trainer form: saves selected letters to EEPROM
+// and updates global variable
+/////////////////////////////////////////////////////////////////
+void handleSaveLetters() 
+{
+  String selected = "";
+  int args = server.args();  // Number of form parameters
+
+  // Collect all selected letters (parameter name: "letters")
+  for (int i = 0; i < args; i++) 
+  {
+    if (server.argName(i) == "letters") 
+    {
+      selected += server.arg(i);  // Append letter
+    }
+  }
+
+  // Save selection to EEPROM and global variable
+  WriteTextToEEPROM(0x40, selected);
+  selectedLetters = selected;  // Update global variable for trainer
+
+  // Send confirmation response to client
+  String content = "<p>Saved: " + selected + "</p>";
+  server.send(200, "text/html", wrapInPage(content));
+}
+
+/////////////////////////////////////////////////////////////////
+/// handleGet() - HTTP GET /get?input1=... or /get?input2=...
+// Saves Morse text from web form to EEPROM
+// Parameter input1 -> EEPROM_MEM1_ADDR
+// Parameter input2 -> EEPROM_MEM2_ADDR
+/////////////////////////////////////////////////////////////////
+void handleGet() 
+{
+  String inputParam = "none";  // Which parameter was received
+
+  if (server.hasArg(TEXT_1))    // Check for input1 parameter
+  {
+    WriteTextToEEPROM(EEPROM_MEM1_ADDR, server.arg(TEXT_1));
+    inputParam = TEXT_1;
+  } 
+  else if (server.hasArg(TEXT_2))  // Check for input2 parameter
+  {
+    WriteTextToEEPROM(EEPROM_MEM2_ADDR, server.arg(TEXT_2));
+    inputParam = TEXT_2;
+  }
+
+  String content = "<p>Saved: " + inputParam + "</p>";
+  server.send(200, "text/html", wrapInPage(content));
+}
+
+/////////////////////////////////////////////////////////////////
+/// generateLetterCheckboxes() - Generate HTML for Letter Checkboxes
+// Generates HTML form elements for all 26 letters
+// Recognizes previously selected letters and marks them as "checked"
+/////////////////////////////////////////////////////////////////
+String generateLetterCheckboxes() 
+{
+  String html = "";
+  
+  // Loop through all 26 letters
+  for (int i = 0; i < 26; i++) 
+  {
+    char letterChar = pgm_read_byte(&LETTERS[i]);  // Read letter from PROGMEM
+    String letter = String(letterChar);             // Convert to String
+    bool checked = selectedLetters.indexOf(letter) != -1;  // Was this letter selected?
+
+    // Generate checkbox HTML
+    html += "<input type='checkbox' name='letters' value='" + letter + "' id='l" + String(i) + "'";
+    if (checked) 
+      html += " checked";  // Mark as already selected
+    html += ">";
+    html += "<label for='l" + String(i) + "'>" + letter + "</label> ";
+
+    // New line after 7 letters for better formatting
+    if ((i+1) % 7 == 0) 
+      html += "<br>";
+  }
+  return html;
+}
+
