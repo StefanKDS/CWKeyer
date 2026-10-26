@@ -20,6 +20,8 @@ Address:  192.168.4.2
 
 ![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Pictures/Keyer.jpg)
 
+# PCB
+![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Pictures/PCB.jpg)
 
 # Circuit
 
