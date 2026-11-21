@@ -1,159 +1,161 @@
 # CW Keyer – STM32F746G-DISCO
 
-Portierung des ESP8266-CW-Keyers (`../CWKeyer_org`) auf das STM32F746G-Discovery-Board
-mit Touch-Bedienung, Audio über den WM8994-Codec und Übungstexten von SD-Karte.
+Port of the ESP8266 CW keyer (`../../CWKeyer_org`) to the STM32F746G Discovery board,
+with touch controls, audio through the WM8994 codec, and practice texts from an SD card.
 
 | Start | Keyer | Monitor |
 |---|---|---|
 | ![](docs/screenshots/home.png) | ![](docs/screenshots/keyer.png) | ![](docs/screenshots/monitor.png) |
-| **Trainer** | **Übung** | **SD-Texte** |
+| **Trainer** | **Practice** | **SD Texts** |
 | ![](docs/screenshots/trainer.png) | ![](docs/screenshots/trainer_drill.png) | ![](docs/screenshots/sd_texte.png) |
-| **Speicher** | **Einstellungen** | **Zeichenauswahl** |
+| **Memory** | **Settings** | **Character Selection** |
 | ![](docs/screenshots/speicher.png) | ![](docs/screenshots/settings_tempo.png) | ![](docs/screenshots/letters.png) |
 
-(Screenshots aus dem PC-Simulator, gleicher Code wie auf dem Board.)
+(Screenshots from the PC simulator; it uses the same code as the board.)
 
-## Funktionen
+## Features
 
-| ESP8266 (Original) | STM32F746G-DISCO |
+| ESP8266 (original) | STM32F746G-DISCO |
 |---|---|
-| OLED-Textmenü + Drehgeber + Mode-Taste | Touch-Display 480×272, Kacheln mit Icons |
-| Iambic-Keyer an D6/D7 | Paddles an Arduino-Leiste D2 (Dit) / D3 (Dah), zusätzlich Handtaste D4, TX-Ausgang D5 |
-| Buzzer / `tone()` 1000 Hz | Mithörton über Kopfhörerausgang (grün), 400–1000 Hz, Lautstärke, weiche Flanken (kein Klicken) |
-| Decoder über A0 (Goertzel, 8,9 kHz) | Decoder über Line-In (blau) des Codecs, 16 kHz, Goertzel + adaptive Schwelle, WPM-Anzeige, Pegelanzeige |
-| 2 Speicher (Web-Seite) | 3 Speicher M1–M3, Bearbeitung mit Bildschirmtastatur |
-| Trainer-Buchstaben (Web-Seite) | Zeichenauswahl A–Z, 0–9, `. , / ? =` + Koch-Lektionen |
-| Farnsworth über Encoder | alle Einstellungen in „Einstellungen“ (Tempo, Audio, Keyer, Decoder, Texte, Info) |
-| EEPROM | interner Flash, Sektor 7, mit Wear-Levelling |
-| – | Übungstexte `*.txt` von SD-Karte, Wiedergabe mit Mitlauf-Markierung oder verborgen (Mitschreiben) |
+| OLED text menu + rotary encoder + mode button | 480×272 touch display with icon tiles |
+| Iambic keyer on D6/D7 | Paddles on Arduino header D2 (Dit) / D3 (Dah), plus straight key D4 and TX output D5 |
+| Buzzer / `tone()` at 1000 Hz | Sidetone through the headphone output (green), 400–1000 Hz, volume control, and soft edges (no clicking) |
+| Decoder through A0 (Goertzel, 8.9 kHz) | Decoder through the codec Line-In (blue), 16 kHz, Goertzel plus adaptive threshold, WPM display, and signal-level indicator |
+| 2 memories (web page) | 3 memories M1–M3, editable with the on-screen keyboard |
+| Trainer letters (web page) | Character selection A–Z, 0–9, `. , / ? =`, plus Koch lessons |
+| Farnsworth via encoder | All settings in **Settings** (Speed, Audio, Keyer, Decoder, Texts, Info) |
+| EEPROM | Internal flash, sector 7, with wear leveling |
+| – | Practice texts (`*.txt`) from an SD card, with synchronized highlighting or hidden text for copy practice |
 
-Trainer-Modi wie im Original: *Hören* (5er-Gruppen, weiter mit E/T), *Geben zufällig*, *Geben A–Z*,
-*Hören + Geben* – jetzt mit Trefferquote und ohne blockierendes `delay(1000)`.
+Trainer modes are the same as in the original: *Listen* (groups of five, continue with E/T),
+*Send Random*, *Send A–Z*, and *Listen + Send* — now with hit accuracy and without blocking
+`delay(1000)` calls.
 
-## Architektur
+## Architecture
 
 ```
             ┌──────────────────────────── Gui/ ─────────────────────────────┐
-            │ screens/scr_*.c   ui.c (Widgets)   gfx.c (Renderer)           │
-            │ fonts.c / icons.c (generiert)                                 │
+            │ screens/scr_*.c   ui.c (widgets)   gfx.c (renderer)          │
+            │ fonts.c / icons.c (generated)                                 │
             └───────────────┬───────────────────────────────────────────────┘
-                            │ liest Zustand, ruft App-Funktionen
-            ┌───────────────▼──────────── App/ (hardwareunabhängig) ────────┐
-            │ app.c  ── verbindet alles, Event-Queues, Mithörton-Synthese   │
+                            │ reads state, calls application functions
+            ┌───────────────▼──────────── App/ (hardware-independent) ─────┐
+            │ app.c  ── connects all components, event queues, sidetone synth│
             │ keyer.c   player.c   cw_decoder.c   trainer.c                 │
             │ morse.c   morse_timing.c   settings.c   text_source.c         │
             └───────────────┬───────────────────────────────────────────────┘
-                            │ port.h (Hardware-Abstraktion)
+                            │ port.h (hardware abstraction)
      ┌──────────────────────▼──────── Platform/ ──────────────┐  ┌── Lib/ ──────┐
      │ port_stm32.c  audio_codec.c (SAI2+WM8994)  display.c   │  │ fat_ro.c     │
-     │ touch.c  flash_store.c  board.c (GPIO, 1-ms-Tick)      │  │ FAT16/32 RO  │
+     │ touch.c  flash_store.c  board.c (GPIO, 1-ms tick)      │  │ FAT16/32 RO  │
      └──────────────────────┬─────────────────────────────────┘  └──────────────┘
                             │
-     Core/ (main, Takt, MPU/Cache, Interrupts)   Drivers/ (ST HAL, CMSIS, BSP)
+     Core/ (main, clocks, MPU/cache, interrupts)   Drivers/ (ST HAL, CMSIS, BSP)
 ```
 
-**Ausführungskontexte**
+**Execution contexts**
 
-| Kontext | Takt | Aufgabe |
+| Context | Rate | Task |
 |---|---|---|
-| SysTick-Interrupt | 1 kHz | `app_tick_1ms()`: Paddles entprellen, Keyer, Text-Wiedergabe, TX-Ausgang |
-| SAI-DMA-Interrupt | alle 4 ms | `app_audio_block()`: Decoder (Goertzel), Mithörton, Durchschleifen Line-In |
-| Hauptschleife | ~30 fps | `app_poll()` (Events, Trainer, Einstellungen speichern), GUI zeichnen, Touch |
+| SysTick interrupt | 1 kHz | `app_tick_1ms()`: paddle debouncing, keyer, text playback, TX output |
+| SAI DMA interrupt | Every 4 ms | `app_audio_block()`: decoder (Goertzel), sidetone, Line-In passthrough |
+| Main loop | ~30 fps | `app_poll()` (events, trainer, settings storage), GUI rendering, touch |
 
-Interrupts → Hauptschleife über lock-freie Event-Queues (`event_queue.h`).
-Alles in `App/`, `Gui/` und `Lib/` ist ohne STM32 übersetzbar – daher gibt es Unit-Tests und
-einen PC-Simulator (siehe unten).
+Interrupts communicate with the main loop through lock-free event queues (`event_queue.h`).
+Everything in `App/`, `Gui/`, and `Lib/` can be compiled without STM32 support, which enables
+unit tests and a PC simulator (see below).
 
-**Zuordnung Original → neu**
+**Original-to-new mapping**
 
-| ESP-Datei | neu |
+| Original ESP file | New location |
 |---|---|
-| `MainLoop.ino` (Paddle-Logik) | `App/Src/keyer.c` |
+| `MainLoop.ino` (paddle logic) | `App/Src/keyer.c` |
 | `SetupPlayback.ino` (`startPlayback/updatePlayback`) | `App/Src/player.c` |
 | `StorageNavigation.ino` (`CalculateTimes`) | `App/Src/morse_timing.c` |
-| `MorseAudio.ino`, `MorseCode.h` | `App/Src/morse.c`, Mithörton in `app.c` |
+| `MorseAudio.ino`, `MorseCode.h` | `App/Src/morse.c`, sidetone in `app.c` |
 | `Decoder.ino` | `App/Src/cw_decoder.c` |
-| `Screens.ino` (Trainer-Teile) | `App/Src/trainer.c` |
-| `Screens.ino`, `InputMenus.ino`, Encoder | `Gui/Src/screens/*.c` |
+| `Screens.ino` (trainer sections) | `App/Src/trainer.c` |
+| `Screens.ino`, `InputMenus.ino`, encoder | `Gui/Src/screens/*.c` |
 | `WebServer.ino`, `WebPage.h` | `scr_memory.c`, `scr_letters.c`, `scr_settings.c` |
 | EEPROM | `App/Src/settings.c` + `Platform/Src/flash_store.c` |
 
-**Verbesserungen gegenüber dem Original-Decoder:** Die Schwelle folgte im Original auch dem Rauschen
-in Pausen (Fehltrigger bei verrauschtem Empfänger). Jetzt getrennte Spitzen- und Rauschboden-Verfolgung
-mit SNR-Bedingung, getrennte Mittelwerte für Dit und Dah (schnellere Anpassung an Tempowechsel) und
-Wortlücken-Erkennung, die auch mit Farnsworth-Abständen funktioniert.
+**Improvements over the original decoder:** The original threshold also tracked noise during
+pauses, which could cause false triggers with a noisy receiver. The new implementation uses
+separate peak and noise-floor tracking with an SNR condition, separate averages for dit and dah
+(faster adaptation to speed changes), and word-gap detection that also works with Farnsworth spacing.
 
-## Anschluss
+## Connections
 
-| Signal | Arduino-Leiste | MCU-Pin |
+| Signal | Arduino Header | MCU Pin |
 |---|---|---|
-| Paddle Dit | D2 | PG6 (Pull-up, gegen GND schalten) |
-| Paddle Dah | D3 | PB4 (Pull-up, gegen GND schalten) |
-| Handtaste (optional) | D4 | PG7 |
-| TX-Tastung (optional) | D5 | PI0 (High = Taste gedrückt; Transistor/Optokoppler verwenden) |
-| Masse | GND | – |
-| Audio-Eingang Decoder | Line-In (blaue Buchse) | WM8994 IN1 |
-| Mithörton / Kopfhörer | grüne Buchse | WM8994 HPOUT1 |
+| Dit paddle | D2 | PG6 (pull-up, switch to GND) |
+| Dah paddle | D3 | PB4 (pull-up, switch to GND) |
+| Straight key (optional) | D4 | PG7 |
+| TX keying (optional) | D5 | PI0 (high = key down; use a transistor or optocoupler) |
+| Ground | GND | – |
+| Decoder audio input | Line-In (blue socket) | WM8994 IN1 |
+| Sidetone / headphones | Green socket | WM8994 HPOUT1 |
 
-Paddles/Pins lassen sich in `Platform/Inc/board.h` ändern. Hinweis: D3 ist am Board PB4 (nicht PG7).
+Paddle and pin assignments can be changed in `Platform/Inc/board.h`. Note: D3 is PB4 on the board (not PG7).
 
-## Projekt einrichten (STM32CubeIDE 2.2)
+## Project Setup (STM32CubeIDE 2.2)
 
-Die ST-Treiber (HAL, CMSIS, BSP, Startup-Datei) sind aus Lizenz-/Größengründen nicht enthalten
-und werden einmalig per Skript aus dem STM32CubeF7-Paket kopiert:
+For licensing and repository-size reasons, the ST drivers (HAL, CMSIS, BSP, startup file) are not included.
+Copy them once from the STM32CubeF7 package using the setup script:
 
-1. STM32CubeF7-Paket besorgen – eine der Varianten:
-   * STM32CubeMX/CubeIDE: *Manage embedded software packages → STM32F7 → installieren*
-     (landet in `C:\Users\<Name>\STM32Cube\Repository\STM32Cube_FW_F7_V1.17.x`)
-   * oder `git clone --recursive https://github.com/STMicroelectronics/STM32CubeF7`
-2. Im Projektordner (PowerShell):
+1. Obtain the STM32CubeF7 package by one of these methods:
+   * STM32CubeMX/CubeIDE: **Manage Embedded Software Packages → STM32F7 → Install**.
+     It will be placed under `C:\Users\<name>\STM32Cube\Repository\STM32Cube_FW_F7_V1.17.x`.
+   * Or: `git clone --recursive https://github.com/STMicroelectronics/STM32CubeF7`
+2. In the project folder (PowerShell):
    ```powershell
-   .\setup_drivers.ps1                       # sucht das Paket automatisch
-   .\setup_drivers.ps1 -CubeF7 D:\STM32CubeF7  # oder Pfad angeben
+   .\setup_drivers.ps1                       # automatically searches for the package
+   .\setup_drivers.ps1 -CubeF7 D:\STM32CubeF7  # or specify the path
    ```
-   (Linux/macOS: `sh setup_drivers.sh <pfad>`)
-3. STM32CubeIDE: *File → Import → General → Existing Projects into Workspace* → diesen Ordner wählen.
-4. *Project → Build Project*, dann *Run → Debug As → STM32 C/C++ Application* (ST-LINK onboard).
+   (Linux/macOS: `sh setup_drivers.sh <path>`)
+3. In STM32CubeIDE, select **File → Import → General → Existing Projects into Workspace** and choose this folder.
+4. Select **Project → Build Project**, then **Run → Debug As → STM32 C/C++ Application** (onboard ST-LINK).
 
-Es gibt keine `.ioc`-Datei: Takt, MPU und Peripherie werden in `Core/Src/main.c` bzw. `Platform/`
-konfiguriert, Display/SDRAM/Touch/SD über das ST-BSP. Das vermeidet, dass CubeMX handgeschriebenen
-Code überschreibt. Optional: `Makefile` für die Kommandozeile (`make`, braucht `arm-none-eabi-gcc`).
+There is no `.ioc` file: clocks, MPU, and peripherals are configured in `Core/Src/main.c` and `Platform/`.
+Display, SDRAM, touch, and SD use the ST BSP. This avoids CubeMX overwriting handwritten code.
+Optionally, use the command-line `Makefile` (`make`, requiring `arm-none-eabi-gcc`).
 
-## SD-Karte
+## SD Card
 
-* FAT16 oder FAT32 (exFAT wird nicht unterstützt), Dateien `*.txt` im Hauptverzeichnis oder im Ordner `CW/`.
-* Bis 16 KiB pro Datei. Umlaute (UTF-8 oder Latin-1) werden zu AE/OE/UE/SS, Kleinbuchstaben zu
-  Großbuchstaben, nicht sendbare Zeichen entfallen.
-* Beispiele: `SD_Card_Examples/CW/`. Karte kann im Betrieb gewechselt werden.
+* FAT16 or FAT32 (exFAT is not supported). Files ending in `*.txt` must be in the root directory or in the `CW/` folder.
+* Maximum 16 KiB per file. Umlaute (UTF-8 or Latin-1) are converted to AE/OE/UE/SS, lowercase
+  letters are converted to uppercase, and characters that cannot be transmitted are removed.
+* Examples are provided in `SD_Card_Examples/CW/`. Cards can be swapped while the system is running.
 
-## Speicherlayout
+## Memory Map
 
-| Bereich | Adresse | Inhalt |
+| Area | Address | Contents |
 |---|---|---|
-| Flash 768 KiB | 0x08000000 | Programm (ca. 300 KiB inkl. Schriften/Icons) |
-| Flash Sektor 7 | 0x080C0000 | Einstellungen (1-KiB-Datensätze, Löschen nur alle 256 Speichervorgänge) |
-| SDRAM | 0xC0000000 | 2 Bildspeicher RGB565 (Double-Buffering), MPU: Write-Through |
-| SRAM2 | 0x2004C000 | Audio-DMA-Puffer, MPU: nicht cachebar |
+| 768 KiB flash | 0x08000000 | Program (about 300 KiB including fonts/icons) |
+| Flash sector 7 | 0x080C0000 | Settings (1-KiB records; erased only after every 256 writes) |
+| SDRAM | 0xC0000000 | 2 RGB565 frame buffers (double buffering), MPU: write-through |
+| SRAM2 | 0x2004C000 | Audio DMA buffers, MPU: non-cacheable |
 
-Einstellungen werden 3 s nach der letzten Änderung bzw. beim Verlassen der Einstellungsseiten gespeichert.
+Settings are saved three seconds after the latest change or when leaving the Settings pages.
 
-## Tests und Simulator (PC, gcc)
+## Tests and Simulator (PC, GCC)
 
 ```sh
-sh Tools/test/run_tests.sh [fat16.img fat32.img]   # Morse, Timing, Keyer, Decoder (5–40 WPM, Rauschen, Farnsworth), FAT
-sh Tools/sim/run_sim.sh <ausgabeordner> [sd.img]   # rendert alle Screens als PPM + Touch-Tests
+sh Tools/test/run_tests.sh [fat16.img fat32.img]   # Morse, timing, keyer, decoder (5–40 WPM, noise, Farnsworth), FAT
+sh Tools/sim/run_sim.sh <output-folder> [sd.img]   # renders all screens as PPM + touch tests
 ```
 
-Generatoren (Python + Pillow): `Tools/gen/gen_fonts.py` (DejaVu-Schriften, 4 bpp),
-`Tools/gen/gen_icons.py` (36 Outline-Icons in 3 Größen), `Tools/gen/gen_cproject.py` (CubeIDE-Projektdateien).
+Generators (Python + Pillow): `Tools/gen/gen_fonts.py` (DejaVu fonts, 4 bpp),
+`Tools/gen/gen_icons.py` (36 outline icons in 3 sizes), `Tools/gen/gen_cproject.py` (CubeIDE project files).
 
-## Beim ersten Test auf der Hardware prüfen
+## Hardware First-Test Checklist
 
-Der hardwareunabhängige Teil ist auf dem PC getestet; der STM32-Teil konnte hier nicht für ARM
-übersetzt werden (keine ST-Treiber/Toolchain in der Erstellungsumgebung). Erfahrungsgemäß kritisch:
+The hardware-independent code has been tested on the PC, but the STM32 section could not be compiled
+for ARM here (ST drivers/toolchain unavailable in the build environment). Common points to check:
 
-* **BSP-Version:** erwartet wird das BSP aus STM32CubeF7 ≥ 1.16 (`BSP_SD_ReadBlocks(pData, BlockAdd, NumOfBlocks, Timeout)`,
-  `BSP_LCD_LayerRgb565Init`). Ältere BSPs haben andere Signaturen.
-* **Line-In-Pegel:** *Einstellungen → Decoder → Eingangsverstärkung* (WM8994 IN1-PGA, −16…+30 dB);
-  die Pegelanzeige im Monitor zeigt Signal und Schwelle.
-* **Kopfhörerlautstärke:** Codec fest auf −6 dB, Lautstärke wird digital geregelt (`audio_codec.c`).
+* **BSP version:** STM32CubeF7 BSP 1.16 or later is required. The code expects
+  `BSP_SD_ReadBlocks(pData, BlockAdd, NumOfBlocks, Timeout)` and `BSP_LCD_LayerRgb565Init`.
+  Older BSPs use different signatures.
+* **Line-In level:** **Settings → Decoder → Input Gain** (WM8994 IN1 PGA, −16…+30 dB).
+  The level meter in Monitor shows the signal and threshold.
+* **Headphone volume:** The codec is fixed at −6 dB; volume is controlled digitally in `audio_codec.c`.
