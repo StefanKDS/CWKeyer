@@ -1,0 +1,1 @@
+Hier legt setup_drivers.ps1 die Datei startup_stm32f746xx.s aus dem STM32CubeF7-Paket ab.

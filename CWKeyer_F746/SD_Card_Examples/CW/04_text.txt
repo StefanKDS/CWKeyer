@@ -1,0 +1,3 @@
+Der Morse-Code wurde 1838 von Samuel Morse und Alfred Vail entwickelt.
+Funkamateure nutzen ihn bis heute, weil er mit wenig Leistung sehr weit reicht.
+Übung macht den Meister: jeden Tag zehn Minuten hören und geben.
