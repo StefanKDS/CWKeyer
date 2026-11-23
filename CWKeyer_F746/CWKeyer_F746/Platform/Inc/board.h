@@ -32,6 +32,7 @@
 #define IRQ_PRIO_SYSTICK    1u   /* keyer / player time base 1 kHz */
 #define IRQ_PRIO_AUDIO      2u   /* SAI DMA: decoder + sidetone    */
 #define IRQ_PRIO_SD         5u
+#define IRQ_PRIO_USB        6u   /* MSC: SD access inside the USB interrupt */
 
 void board_gpio_init(void);
 void board_tick_enable(void);   /* start calling app_tick_1ms()    */

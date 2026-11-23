@@ -7,6 +7,7 @@
 #include "board.h"
 #include "flash_store.h"
 #include "stm32746g_discovery_sd.h"
+#include "usb_device.h"
 
 /* ---- time / system ----------------------------------------------------- */
 
@@ -84,9 +85,24 @@ bool port_settings_save(const void *buf, size_t len)
     return flash_store_save(buf, len);
 }
 
-/* ---- SD card ---------------------------------------------------------------- */
+/* ---- SD card ----------------------------------------------------------------
+ * The card is shared with the USB mass storage class, which accesses it from
+ * the USB interrupt. Accesses from the main loop therefore mask that interrupt. */
 
-static bool s_sd_ok;
+static volatile bool s_sd_ok;
+
+bool sd_card_ready(void)
+{
+    return s_sd_ok;
+}
+
+bool sd_card_init(void)
+{
+    if (s_sd_ok)
+        BSP_SD_DeInit();          /* card may have been changed */
+    s_sd_ok = (BSP_SD_Init() == MSD_OK);
+    return s_sd_ok;
+}
 
 bool port_sd_present(void)
 {
@@ -95,23 +111,48 @@ bool port_sd_present(void)
 
 bool port_sd_init(void)
 {
-    if (s_sd_ok)
-        BSP_SD_DeInit();          /* card may have been changed */
-    s_sd_ok = (BSP_SD_Init() == MSD_OK);
-    return s_sd_ok;
+    HAL_NVIC_DisableIRQ(OTG_FS_IRQn);
+    bool ok = sd_card_init();
+    HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+    return ok;
 }
 
 bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t count)
 {
-    if (!s_sd_ok)
+    if (!s_sd_ok || usb_device_active())
         return false;
-    if (BSP_SD_ReadBlocks((uint32_t *)(void *)buf, lba, count, 1000) != MSD_OK)
-        return false;
-    uint32_t t0 = HAL_GetTick();
-    while (BSP_SD_GetCardState() != SD_TRANSFER_OK)
+    bool ok = false;
+    HAL_NVIC_DisableIRQ(OTG_FS_IRQn);
+    if (BSP_SD_ReadBlocks((uint32_t *)(void *)buf, lba, count, 1000) == MSD_OK)
     {
-        if (HAL_GetTick() - t0 > 1000u)
-            return false;
+        uint32_t t0 = HAL_GetTick();
+        ok = true;
+        while (BSP_SD_GetCardState() != SD_TRANSFER_OK)
+        {
+            if (HAL_GetTick() - t0 > 1000u)
+            {
+                ok = false;
+                break;
+            }
+        }
     }
-    return true;
+    HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+    return ok;
+}
+
+/* ---- USB ------------------------------------------------------------------- */
+
+void port_usb_drive(bool on)
+{
+    usb_device_enable(on);
+}
+
+bool port_usb_active(void)
+{
+    return usb_device_active();
+}
+
+bool port_usb_host_connected(void)
+{
+    return usb_device_configured();
 }

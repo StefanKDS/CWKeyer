@@ -10,8 +10,10 @@ INCLUDES = ["../Core/Inc", "../App/Inc", "../Gui/Inc", "../Lib/Inc", "../Platfor
             "../Drivers/STM32F7xx_HAL_Driver/Inc", "../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy",
             "../Drivers/CMSIS/Device/ST/STM32F7xx/Include", "../Drivers/CMSIS/Include",
             "../Drivers/BSP/STM32746G-Discovery", "../Drivers/BSP/Components/wm8994",
-            "../Drivers/BSP/Components/Common"]
-SOURCES = ["App", "Core", "Drivers", "Gui", "Lib", "Platform"]
+            "../Drivers/BSP/Components/Common",
+            "../Middlewares/ST/STM32_USB_Device_Library/Core/Inc",
+            "../Middlewares/ST/STM32_USB_Device_Library/Class/MSC/Inc"]
+SOURCES = ["App", "Core", "Drivers", "Gui", "Lib", "Middlewares", "Platform"]
 
 _n = [1000]
 def nid():

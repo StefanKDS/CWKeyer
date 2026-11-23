@@ -33,12 +33,12 @@ static void menu_frame(void)
 
     static const struct { icon_id_t icon; const char *label; int mode; } tiles[6] =
     {
-        { ICON_EAR,     "Listen (Groups)", TRAINER_HEAR          },
-        { ICON_SHUFFLE, "Send Random",     TRAINER_GIVE_RANDOM   },
-        { ICON_SORT_AZ, "Send A-Z",        TRAINER_GIVE_AZ       },
-        { ICON_REPEAT,  "Listen + Send",   TRAINER_LISTEN_REPEAT },
+        { ICON_EAR,     "Listen (groups)", TRAINER_HEAR          },
+        { ICON_SHUFFLE, "Send random",    TRAINER_GIVE_RANDOM   },
+        { ICON_SORT_AZ, "Send A–Z",        TRAINER_GIVE_AZ       },
+        { ICON_REPEAT,  "Listen + send",   TRAINER_LISTEN_REPEAT },
         { ICON_FILE,    "Text from SD",    -1                    },
-        { ICON_ABC,     "Character Set",   -2                    },
+        { ICON_ABC,     "Characters",      -2                    },
     };
 
     for (int i = 0; i < 6; i++)
@@ -117,8 +117,7 @@ static void draw_big_letter(rect_t r, const trainer_state_t *st)
         ui_label(R(r.x, r.y + 30, r.w, 60), &font_large, txt, st->reveal ? COL_TEXT : COL_MUTED, ALIGN_CENTER);
         gfx_text_in(&font_mono, R(r.x, r.y + 90, r.w, 30), st->reveal ? st->target : "", COL_MUTED, ALIGN_CENTER);
         ui_label(R(r.x, r.y + r.h - 50, r.w, 40), &font_small,
-                 player_busy() ? "Playing ..." : "Send E or T = next group", COL_MUTED, ALIGN_CENTER);
-        ui_label(R(r.x, r.y + r.h - 40, r.w, 30), &font_small, "Listen and repeat", COL_MUTED, ALIGN_CENTER);
+                 player_busy() ? "playing ..." : "Send E or T for the next group", COL_MUTED, ALIGN_CENTER);
         return;
     }
 
@@ -136,7 +135,7 @@ static void draw_big_letter(rect_t r, const trainer_state_t *st)
     else
     {
         ui_label(R(r.x, r.y + 4, r.w, r.h - 40), &font_huge, "?", COL_MUTED, ALIGN_CENTER);
-        ui_label(R(r.x, r.y + r.h - 40, r.w, 30), &font_small, "listen and send", COL_MUTED, ALIGN_CENTER);
+        ui_label(R(r.x, r.y + r.h - 40, r.w, 30), &font_small, "listen and send it back", COL_MUTED, ALIGN_CENTER);
     }
 }
 
@@ -172,7 +171,7 @@ static void drill_frame(void)
     else
     {
         gfx_rrect(fb, RADIUS, COL_BG, COL_BORDER, 1);
-        ui_label(fb, &font_small, st->mode == TRAINER_HEAR ? "Listen" : "Send with paddles", COL_MUTED, ALIGN_CENTER);
+        ui_label(fb, &font_small, st->mode == TRAINER_HEAR ? "listen" : "use the paddle", COL_MUTED, ALIGN_CENTER);
     }
     y += 58 + 8;
 

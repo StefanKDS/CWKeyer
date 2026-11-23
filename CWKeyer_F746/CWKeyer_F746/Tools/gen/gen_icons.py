@@ -221,6 +221,15 @@ def swap(p):
     p.line((4, 8), (20, 8)); p.line((16, 4), (20, 8), (16, 12))
     p.line((20, 16), (4, 16)); p.line((8, 12), (4, 16), (8, 20))
 
+def usb(p):
+    p.line((12, 4), (12, 19))
+    p.poly((12, 2), (9.5, 5.5), (14.5, 5.5))
+    p.circle(12, 20, 1.8, fill=True)
+    p.line((12, 15), (7, 11.5), (7, 9))
+    p.d.rectangle((p.p(5.5, 6.5)[0], p.p(5.5, 6.5)[1], p.p(8.5, 9.5)[0], p.p(8.5, 9.5)[1]), fill=255)
+    p.line((12, 13), (17, 10), (17, 8.5))
+    p.circle(17, 7.5, 1.6, fill=True)
+
 def home(p):
     p.line((5, 12), (3, 12), (12, 3), (21, 12), (19, 12))
     p.line((5, 12), (5, 20), (19, 20), (19, 12))
@@ -236,7 +245,7 @@ ICONS = [("KEY", key), ("WAVE", wave), ("SCHOOL", school), ("FILE", file_text),
          ("VOLUME", volume), ("VOLUME_OFF", volume_off), ("EAR", ear),
          ("SHUFFLE", shuffle), ("SORT_AZ", sort_az), ("REPEAT", repeat),
          ("ABC", abc), ("INFO", info), ("SD", sdcard), ("ANTENNA", antenna),
-         ("KEYBOARD", keyboard), ("REFRESH", refresh), ("SWAP", swap), ("HOME", home)]
+         ("KEYBOARD", keyboard), ("REFRESH", refresh), ("SWAP", swap), ("HOME", home), ("USB", usb)]
 
 
 def render(fn, size):

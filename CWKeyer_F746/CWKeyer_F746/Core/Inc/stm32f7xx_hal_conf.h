@@ -25,6 +25,7 @@ extern "C" {
 #define HAL_SDRAM_MODULE_ENABLED
 #define HAL_UART_MODULE_ENABLED
 #define HAL_EXTI_MODULE_ENABLED
+#define HAL_PCD_MODULE_ENABLED
 
 /* ---- oscillators -------------------------------------------------------- */
 #if !defined(HSE_VALUE)
@@ -149,6 +150,9 @@ extern "C" {
 #endif
 #ifdef HAL_SD_MODULE_ENABLED
   #include "stm32f7xx_hal_sd.h"
+#endif
+#ifdef HAL_PCD_MODULE_ENABLED
+  #include "stm32f7xx_hal_pcd.h"
 #endif
 #ifdef HAL_UART_MODULE_ENABLED
   #include "stm32f7xx_hal_uart.h"

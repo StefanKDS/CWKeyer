@@ -11,6 +11,7 @@
 #define FB_SIZE   (480u * 272u * 2u)
 #define FB0       (LCD_FB_START_ADDRESS)
 #define FB1       (LCD_FB_START_ADDRESS + FB_SIZE)
+#define FB_CANVAS (LCD_FB_START_ADDRESS + 2u * FB_SIZE)   /* render target for 180 deg */
 
 static uint32_t s_front = FB0;
 
@@ -31,27 +32,33 @@ bool display_init(void)
     return true;
 }
 
-uint16_t *display_backbuffer(void)
+static uint32_t backbuffer(void)
 {
-    return (uint16_t *)((s_front == FB0) ? FB1 : FB0);
+    return (s_front == FB0) ? FB1 : FB0;
 }
 
-static void rotate_180(uint16_t *fb)
+uint16_t *display_canvas(bool rotate180)
 {
-    uint32_t count = 480u * 272u;
-    for (uint32_t i = 0u, j = count - 1u; i < j; ++i, --j)
+    return (uint16_t *)(rotate180 ? FB_CANVAS : backbuffer());
+}
+
+/* copy src into dst turned by 180 degrees (= reversed pixel order) */
+static void rotate_copy(const uint32_t *src, uint32_t *dst)
+{
+    const uint32_t n = FB_SIZE / 4u;            /* two pixels per word */
+    uint32_t *d = dst + n - 1u;
+    for (uint32_t i = 0; i < n; i++)
     {
-        uint16_t tmp = fb[i];
-        fb[i] = fb[j];
-        fb[j] = tmp;
+        uint32_t v = src[i];
+        *d-- = (v >> 16) | (v << 16);
     }
 }
 
-void display_swap(void)
+void display_swap(bool rotate180)
 {
-    uint32_t back = (s_front == FB0) ? FB1 : FB0;
-
-    rotate_180((uint16_t *)back);
+    uint32_t back = backbuffer();
+    if (rotate180)
+        rotate_copy((const uint32_t *)FB_CANVAS, (uint32_t *)back);
 
     /* frame buffer region is write-through (MPU), no cache clean needed */
     __DSB();

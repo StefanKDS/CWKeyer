@@ -9,6 +9,6 @@
 #include "ui.h"
 
 bool touch_init(void);
-void touch_read(touch_t *t);
+void touch_read(touch_t *t, bool rotate180);
 
 #endif

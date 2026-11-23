@@ -75,6 +75,16 @@ foreach ($c in @("Common", "wm8994", "ft5336", "rk043fn48h")) {
     if (Test-Path $cs) { Copy-Item $cs (Join-Path $proj "Drivers\BSP\Components\$c") -Force }
 }
 
+# USB device library (core + mass storage class), without templates
+$usb = "Middlewares\ST\STM32_USB_Device_Library"
+foreach ($d in @("Core\Inc", "Core\Src", "Class\MSC\Inc", "Class\MSC\Src")) {
+    $dst = Join-Path $proj "$usb\$d"
+    New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    Get-ChildItem (Join-Path $CubeF7 "$usb\$d\*") -File |
+        Where-Object { $_.Name -notlike "*_template.*" } |
+        Copy-Item -Destination $dst -Force
+}
+
 # fonts used by the BSP LCD driver (included as .c by stm32746g_discovery_lcd.c, not compiled separately)
 CopyDir "Utilities\Fonts" "Utilities\Fonts" "*.*"
 

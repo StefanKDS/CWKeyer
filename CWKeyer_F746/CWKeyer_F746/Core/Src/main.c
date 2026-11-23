@@ -6,7 +6,7 @@
  *
  *   Core/      start-up, clocks, MPU/cache, interrupt vectors
  *   Platform/  board specific drivers (audio codec, display, touch,
- *              GPIO, flash storage) and the port.h implementation
+ *              GPIO, flash storage, USB mass storage) and port.h
  *   App/       hardware independent logic (keyer, player, decoder,
  *              trainer, settings, SD texts)          <- ported ESP code
  *   Gui/       touch UI: renderer, widgets, screens, fonts, icons
@@ -14,6 +14,7 @@
  *
  * Contexts:  SysTick 1 kHz -> app_tick_1ms()   (paddles, keyer, player)
  *            SAI DMA       -> app_audio_block() (decoder, sidetone)
+ *            USB OTG FS    -> mass storage access to the SD card
  *            main loop     -> app_poll(), GUI at ~30 fps
  */
 #include "main.h"
@@ -25,6 +26,8 @@
 #include "stm32746g_discovery_sd.h"
 #include "text_source.h"
 #include "touch.h"
+#include "settings.h"
+#include "usb_device.h"
 
 #define FRAME_MS        33u     /* ~30 fps */
 #define SD_POLL_MS      1000u
@@ -45,6 +48,7 @@ int main(void)
     board_gpio_init();
     if (!display_init())
         Error_Handler();
+    usb_device_clock_config();        /* 48 MHz for USB FS + SDMMC */
     touch_init();
 
     app_init();                       /* loads settings from flash */
@@ -52,6 +56,7 @@ int main(void)
     app_apply_settings();             /* now also reaches the codec */
 
     text_source_scan();
+    usb_device_init();                /* SD card as USB drive on CN13, switched on in the GUI */
     gui_init();
     board_tick_enable();
 
@@ -67,13 +72,14 @@ int main(void)
         if (now - last_frame >= FRAME_MS)
         {
             last_frame = now;
+            bool rot = g_settings.rotate180 != 0;
             touch_t t;
-            touch_read(&t);
-            gui_render(display_backbuffer(), &t, now);
-            display_swap();
+            touch_read(&t, rot);
+            gui_render(display_canvas(rot), &t, now);
+            display_swap(rot);
         }
 
-        /* SD card inserted / removed -> rescan */
+        /* SD card inserted / removed -> rescan (USB drive on/off is handled by the GUI) */
         if (now - last_sd >= SD_POLL_MS)
         {
             last_sd = now;

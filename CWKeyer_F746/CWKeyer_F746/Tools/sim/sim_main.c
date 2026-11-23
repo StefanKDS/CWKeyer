@@ -33,6 +33,10 @@ bool port_settings_load(void *b, size_t l) { (void)b; (void)l; return false; }
 bool port_settings_save(const void *b, size_t l) { (void)b; (void)l; return true; }
 bool port_sd_present(void) { return s_img != NULL; }
 bool port_sd_init(void) { return true; }
+static bool s_usb;
+void port_usb_drive(bool on) { s_usb = on; }
+bool port_usb_active(void) { return s_usb; }
+bool port_usb_host_connected(void) { return s_usb; }
 bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t n)
 {
     fseek(s_img, (long)lba * 512, SEEK_SET);
@@ -154,6 +158,12 @@ int main(int argc, char **argv)
     tap(290, 250);                      /* play */
     idle(60);
     shot("09_sdtext");
+    tap(160, 244);                      /* USB drive on */
+    EXPECT(port_usb_active() && text_source_status() == TS_USB, "USB drive switched on");
+    idle(1);
+    shot("09b_sdtext_usb");
+    tap(90, 178);                       /* Disconnect */
+    EXPECT(!port_usb_active() && text_source_status() == TS_READY, "USB drive switched off, card rescanned");
     tap(20, 15);
 
     tap(240, 200);

@@ -40,6 +40,10 @@ bool port_settings_load(void *b, size_t l) { (void)b; (void)l; return false; }
 bool port_settings_save(const void *b, size_t l) { (void)b; (void)l; return true; }
 bool port_sd_present(void) { return img != NULL; }
 bool port_sd_init(void) { return true; }
+static bool s_usb;
+void port_usb_drive(bool on) { s_usb = on; }
+bool port_usb_active(void) { return s_usb; }
+bool port_usb_host_connected(void) { return s_usb; }
 bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t n)
 {
     fseek(img, (long)lba * 512, SEEK_SET);

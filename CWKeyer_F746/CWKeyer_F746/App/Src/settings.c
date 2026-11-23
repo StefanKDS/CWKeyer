@@ -48,6 +48,7 @@ void settings_defaults(settings_t *s)
     s->dec_freq_hz      = 700;
     s->dec_squelch      = 20;
     s->group_len        = 5;
+    s->rotate180        = 1;
     strcpy(s->letters, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
     strcpy(s->mem[0], "CQ CQ CQ DE DL0ABC DL0ABC K");
     strcpy(s->mem[1], "TNX FER QSO 73 ES GL");
@@ -72,6 +73,7 @@ void settings_sanitize(settings_t *s)
     if (s->line_gain_db < -16) s->line_gain_db = -16;
     if (s->line_gain_db > 30)  s->line_gain_db = 30;
     if (s->keyer_mode > KEYER_IAMBIC_PLAIN) s->keyer_mode = KEYER_IAMBIC_MEMORY;
+    s->rotate180    = s->rotate180 ? 1 : 0;
 
     s->letters[LETTERS_LEN] = '\0';
     for (int i = 0; i < MEM_COUNT; i++)

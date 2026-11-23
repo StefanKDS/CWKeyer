@@ -37,4 +37,12 @@ bool port_sd_present(void);
 bool port_sd_init(void);
 bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t count);
 
+/* ---- USB mass storage ----------------------------------------------------- */
+/** switch the USB drive on/off (off: USB FS only supplies power) */
+void port_usb_drive(bool on);
+/** true while the USB drive is switched on - the app must not access the SD card */
+bool port_usb_active(void);
+/** true when a PC has mounted (configured) the drive */
+bool port_usb_host_connected(void);
+
 #endif

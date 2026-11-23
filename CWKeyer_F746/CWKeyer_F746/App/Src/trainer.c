@@ -161,7 +161,7 @@ const char *trainer_mode_name(trainer_mode_t m)
 {
     static const char *const names[TRAINER_MODE_COUNT] =
     {
-        "Listen", "Send Random", "Send A-Z", "Listen + Send"
+        "Listen", "Send random", "Send A–Z", "Listen + send"
     };
     return (m < TRAINER_MODE_COUNT) ? names[m] : "";
 }

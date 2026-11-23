@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 #define SETTINGS_MAGIC     0x43574B59u   /* "CWKY" */
-#define SETTINGS_VERSION   1u
+#define SETTINGS_VERSION   2u
 
 #define MEM_COUNT          3             /**< number of text memories */
 #define MEM_TEXT_LEN       128           /**< max chars per memory    */
@@ -51,6 +51,9 @@ typedef struct
     /* trainer */
     uint8_t  group_len;           /**< letters per group (hear)    */
     char     letters[LETTERS_LEN + 1];
+
+    /* display */
+    uint8_t  rotate180;           /**< display + touch turned by 180 deg */
 
     /* memories */
     char     mem[MEM_COUNT][MEM_TEXT_LEN + 1];

@@ -52,7 +52,7 @@ static void toggle(char c)
 
 static void frame(void)
 {
-    if (ui_statusbar("Trainer Character Selection", true))
+    if (ui_statusbar("Trainer characters", true))
         screen_back();
 
     const int per_row = 14, kg = 3;

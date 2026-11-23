@@ -9,7 +9,9 @@
 #include <stdint.h>
 
 bool      display_init(void);
-uint16_t *display_backbuffer(void);
-void      display_swap(void);          /**< show back buffer at next VSYNC */
+/** buffer the GUI renders into. With rotate180 a separate canvas is used
+ *  that display_swap() copies turned by 180 degrees into the back buffer. */
+uint16_t *display_canvas(bool rotate180);
+void      display_swap(bool rotate180);   /**< show the new frame at next VSYNC */
 
 #endif

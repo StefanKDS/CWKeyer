@@ -48,6 +48,7 @@ typedef enum
     ICON_REFRESH,
     ICON_SWAP,
     ICON_HOME,
+    ICON_USB,
     ICON_COUNT
 } icon_id_t;
 

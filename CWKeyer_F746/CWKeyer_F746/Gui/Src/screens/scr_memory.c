@@ -42,7 +42,7 @@ static void leave(void)
 
 static void frame(void)
 {
-    if (ui_statusbar("Edit Memory", true))
+    if (ui_statusbar("Edit memories", true))
         screen_back();
 
     int y = CONTENT_Y + 4;
@@ -64,9 +64,9 @@ static void frame(void)
     static const char *const rows[4] =
     {
         "1234567890",
-        "QWERTZUIOP",
+        "QWERTYUIOP",
         "ASDFGHJKL/",
-        "YXCVBNM?.,",
+        "ZXCVBNM?.,",
     };
     const int kh = 34, kg = 4;
     const int kw = (LCD_W - 2 * PAD - 9 * kg) / 10;

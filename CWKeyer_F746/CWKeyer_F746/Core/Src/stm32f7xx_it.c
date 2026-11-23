@@ -9,6 +9,7 @@
 extern SAI_HandleTypeDef hsai_tx;
 extern SAI_HandleTypeDef hsai_rx;
 extern SD_HandleTypeDef  uSdHandle;     /* stm32746g_discovery_sd.c */
+extern PCD_HandleTypeDef hpcd_fs;       /* usbd_conf.c */
 
 void NMI_Handler(void)        { }
 void HardFault_Handler(void)  { for (;;) { } }
@@ -33,3 +34,6 @@ void DMA2_Stream7_IRQHandler(void) { HAL_DMA_IRQHandler(hsai_rx.hdmarx); }
 void DMA2_Stream3_IRQHandler(void) { if (uSdHandle.hdmarx) HAL_DMA_IRQHandler(uSdHandle.hdmarx); }
 void DMA2_Stream6_IRQHandler(void) { if (uSdHandle.hdmatx) HAL_DMA_IRQHandler(uSdHandle.hdmatx); }
 void SDMMC1_IRQHandler(void)       { HAL_SD_IRQHandler(&uSdHandle); }
+
+/* USB OTG FS (mass storage) */
+void OTG_FS_IRQHandler(void)       { HAL_PCD_IRQHandler(&hpcd_fs); }

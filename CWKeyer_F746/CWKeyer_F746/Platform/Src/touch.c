@@ -12,7 +12,7 @@ bool touch_init(void)
     return s_ok;
 }
 
-void touch_read(touch_t *t)
+void touch_read(touch_t *t, bool rotate180)
 {
     TS_StateTypeDef st;
     t->down = false;
@@ -21,7 +21,13 @@ void touch_read(touch_t *t)
     if (st.touchDetected)
     {
         t->down = true;
-        t->x = (int16_t)(479u - st.touchX[0]);
-        t->y = (int16_t)(271u - st.touchY[0]);
+        int x = st.touchX[0], y = st.touchY[0];
+        if (rotate180)
+        {
+            x = 479 - x;
+            y = 271 - y;
+        }
+        t->x = (int16_t)x;
+        t->y = (int16_t)y;
     }
 }

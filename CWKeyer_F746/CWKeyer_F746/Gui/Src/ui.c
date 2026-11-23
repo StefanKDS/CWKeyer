@@ -369,9 +369,9 @@ bool ui_statusbar(const char *title, bool back)
     /* right side, from right to left */
     int rx = LCD_W - 8;
     int cy = (BAR_H - ICON_PX_S) / 2;
-    bool sd = text_source_status() == TS_READY;
+    text_source_status_t ts = text_source_status();
     rx -= ICON_PX_S;
-    gfx_icon(ICON_SD, ICON_S, rx, cy, sd ? COL_GREEN : COL_DISABLED);
+    gfx_icon(ICON_SD, ICON_S, rx, cy, ts == TS_READY ? COL_GREEN : ts == TS_USB ? COL_ACCENT : COL_DISABLED);
     rx -= ICON_PX_S + 8;
     gfx_icon(g_settings.sidetone_on ? ICON_VOLUME : ICON_VOLUME_OFF, ICON_S, rx, cy, COL_MUTED);
     if (g_settings.key_out_on)

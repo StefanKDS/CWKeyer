@@ -24,9 +24,9 @@ static void frame(void)
         { ICON_KEY,    "Keyer",         SCR_KEYER    },
         { ICON_WAVE,   "Monitor",       SCR_MONITOR  },
         { ICON_SCHOOL, "Trainer",       SCR_TRAINER  },
-        { ICON_FILE,   "SD Texts",     SCR_SDTEXT   },
-        { ICON_FLOPPY, "Memory",       SCR_MEMORY   },
-        { ICON_GEAR,   "Settings",     SCR_SETTINGS },
+        { ICON_FILE,   "SD texts",      SCR_SDTEXT   },
+        { ICON_FLOPPY, "Memories",      SCR_MEMORY   },
+        { ICON_GEAR,   "Settings",      SCR_SETTINGS },
     };
 
     for (int i = 0; i < 6; i++)

@@ -51,10 +51,13 @@ static int cmp_name(const text_file_t *a, const text_file_t *b)
 
 text_source_status_t text_source_scan(void)
 {
+    /* USB drive on: keep the text already loaded (it can still be played) */
+    if (port_usb_active())
+        return s_status = TS_USB;
+
     s_count  = 0;
     s_loaded = -1;
     s_len    = 0;
-
     if (!port_sd_present())
         return s_status = TS_NO_CARD;
     if (!port_sd_init() || fat_mount(&s_fs, port_sd_read) != FAT_OK)
@@ -91,6 +94,8 @@ int         text_source_loaded_index(void)   { return s_loaded; }
 
 bool text_source_load(int idx)
 {
+    if (port_usb_active() || s_status != TS_READY)
+        return false;
     if (idx < 0 || idx >= s_count)
         return false;
 

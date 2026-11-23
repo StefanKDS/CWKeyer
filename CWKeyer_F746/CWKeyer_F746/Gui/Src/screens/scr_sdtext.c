@@ -4,6 +4,7 @@
  */
 #include "app.h"
 #include "player.h"
+#include "port.h"
 #include "screens.h"
 #include "text_source.h"
 #include "ui.h"
@@ -35,7 +36,7 @@ static void select_file(int i)
 
 static void frame(void)
 {
-    if (ui_statusbar("SD Texts", true))
+    if (ui_statusbar("SD texts", true))
         screen_back();
 
     const int list_w = 172;
@@ -49,14 +50,33 @@ static void frame(void)
     /* ---- file list ---- */
     if (text_source_status() != TS_READY)
     {
-        const char *msg = text_source_status() == TS_NO_CARD ? "No SD Card" : "SD Error (FAT16/32?)";
-        ui_label(R(PAD, y0, list_w, 40), &font_normal, msg, COL_MUTED, ALIGN_CENTER);
+        if (text_source_status() == TS_USB)
+        {
+            bool host = port_usb_host_connected();
+            gfx_icon_center(ICON_USB, ICON_L, R(PAD, y0, list_w, 52), host ? COL_ACCENT : COL_MUTED);
+            ui_label(R(PAD, y0 + 52, list_w, 22), &font_normal, host ? "Connected to PC" : "Waiting for PC ...",
+                     COL_TEXT, ALIGN_CENTER);
+            ui_label(R(PAD, y0 + 76, list_w, 18), &font_small, "Eject the drive on the PC,", COL_MUTED, ALIGN_CENTER);
+            ui_label(R(PAD, y0 + 93, list_w, 18), &font_small, "then disconnect here", COL_MUTED, ALIGN_CENTER);
+            if (ui_button(R(PAD, y0 + 118, list_w, 44), ICON_USB, "Disconnect", UI_FILLED))
+            {
+                port_usb_drive(false);
+                text_source_scan();
+                s_sel = -1;
+                s_first = 0;
+            }
+        }
+        else
+        {
+            const char *msg = text_source_status() == TS_NO_CARD ? "No SD card" : "SD error (FAT16/32?)";
+            ui_label(R(PAD, y0, list_w, 40), &font_normal, msg, COL_MUTED, ALIGN_CENTER);
+        }
     }
     else if (count == 0)
     {
         ui_label(R(PAD, y0, list_w, 40), &font_normal, "No *.txt files", COL_MUTED, ALIGN_CENTER);
     }
-    for (int i = 0; i < visible && s_first + i < count; i++)
+    for (int i = 0; i < visible && s_first + i < count && text_source_status() == TS_READY; i++)
     {
         int idx = s_first + i;
         if (ui_list_item(R(PAD, y0 + i * item_h, list_w, item_h - 2), ICON_FILE,
@@ -64,17 +84,24 @@ static void frame(void)
             select_file(idx);
     }
     int ny = y0 + list_h + 6;
-    int nb = (list_w - 2 * 6) / 3;
-    if (ui_button(R(PAD, ny, nb, nav_h), ICON_SKIP_BACK, NULL, s_first > 0 ? 0 : UI_DISABLED))
+    int nb = (list_w - 3 * 5) / 4;
+    bool usb = text_source_status() == TS_USB;
+    if (ui_button(R(PAD, ny, nb, nav_h), ICON_SKIP_BACK, NULL, s_first > 0 && !usb ? 0 : UI_DISABLED))
         s_first = s_first - visible < 0 ? 0 : s_first - visible;
-    if (ui_button(R(PAD + nb + 6, ny, nb, nav_h), ICON_SKIP_FWD, NULL, s_first + visible < count ? 0 : UI_DISABLED))
+    if (ui_button(R(PAD + nb + 5, ny, nb, nav_h), ICON_SKIP_FWD, NULL, s_first + visible < count && !usb ? 0 : UI_DISABLED))
         s_first += visible;
-    if (ui_button(R(PAD + 2 * (nb + 6), ny, nb, nav_h), ICON_REFRESH, NULL, 0))
+    if (ui_button(R(PAD + 2 * (nb + 5), ny, nb, nav_h), ICON_REFRESH, NULL, usb ? UI_DISABLED : 0))
     {
         app_stop_playback();
         text_source_scan();
         s_sel = -1;
         s_first = 0;
+    }
+    /* USB drive: the PC gets the card, the keyer releases it */
+    if (ui_button(R(PAD + 3 * (nb + 5), ny, list_w - 3 * (nb + 5), nav_h), ICON_USB, NULL, usb ? UI_ACCENT : 0) && !usb)
+    {
+        port_usb_drive(true);
+        text_source_scan();      /* -> TS_USB */
     }
 
     /* ---- text + player ---- */
@@ -82,7 +109,7 @@ static void frame(void)
     int w = LCD_W - PAD - x;
     int bh = 44;
     int text_h = CONTENT_H - 2 * PAD - bh - 20;
-    bool loaded = s_sel >= 0 && text_source_loaded_index() == s_sel;
+    bool loaded = s_sel >= 0 && text_source_loaded_index() == s_sel && text_source_len() > 0;
     bool playing = player_busy();
     int pos = playing ? (int)player_pos() : -1;
 
@@ -90,7 +117,7 @@ static void frame(void)
     {
         gfx_rrect(R(x, y0, w, text_h), 6, COL_TEXTAREA, COL_BORDER, 1);
         gfx_icon_center(ICON_EAR, ICON_L, R(x, y0, w, text_h - 30), COL_BORDER);
-        ui_label(R(x, y0 + text_h - 50, w, 30), &font_small, "Text hidden - copy it down", COL_MUTED, ALIGN_CENTER);
+        ui_label(R(x, y0 + text_h - 50, w, 30), &font_small, "Text hidden – copy by ear", COL_MUTED, ALIGN_CENTER);
     }
     else if (loaded)
     {

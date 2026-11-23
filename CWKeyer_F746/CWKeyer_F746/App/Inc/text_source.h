@@ -16,6 +16,7 @@ typedef enum
     TS_NO_CARD = 0,
     TS_ERROR,
     TS_READY,
+    TS_USB,          /**< card is used by a PC via USB mass storage */
 } text_source_status_t;
 
 text_source_status_t text_source_scan(void);       /**< (re)mount + list files */

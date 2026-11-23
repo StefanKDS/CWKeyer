@@ -54,12 +54,12 @@ static void frame(void)
     snprintf(buf, sizeof buf, "%u Hz", g_settings.dec_freq_hz);
     gfx_rrect(R(x, y, 120, bottom_h), 6, COL_PANEL, COL_BORDER, 1);
     gfx_text(&font_small, x + 10, y + 13, "Tone", COL_MUTED);
-    gfx_text(&font_bold, x + 42, y + 12, buf, COL_TEXT);
+    gfx_text(&font_bold, x + 46, y + 12, buf, COL_TEXT);
     x += 120 + 6;
     snprintf(buf, sizeof buf, "%u WPM", st.wpm);
     gfx_rrect(R(x, y, 136, bottom_h), 6, COL_PANEL, COL_BORDER, 1);
-    gfx_text(&font_small, x + 10, y + 13, "Decoded", COL_MUTED);
-    gfx_text(&font_bold, x + 66, y + 12, buf, COL_TEXT);
+    gfx_text(&font_small, x + 10, y + 13, "detected", COL_MUTED);
+    gfx_text(&font_bold, x + 70, y + 12, buf, COL_TEXT);
     x += 136 + 6;
 
     int bw = (LCD_W - PAD - x - 2 * 6) / 3;

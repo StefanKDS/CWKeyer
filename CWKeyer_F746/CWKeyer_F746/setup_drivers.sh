@@ -34,5 +34,12 @@ for c in Common wm8994 ft5336 rk043fn48h; do
   cp "$CUBE/Drivers/BSP/Components/$c/"*.h "$PROJ/Drivers/BSP/Components/$c/"
   ls "$CUBE/Drivers/BSP/Components/$c/"*.c >/dev/null 2>&1 && cp "$CUBE/Drivers/BSP/Components/$c/"*.c "$PROJ/Drivers/BSP/Components/$c/"
 done
+U=Middlewares/ST/STM32_USB_Device_Library
+for d in Core/Inc Core/Src Class/MSC/Inc Class/MSC/Src; do
+  mkdir -p "$PROJ/$U/$d"
+  for f in "$CUBE/$U/$d/"*; do
+    case "$f" in *_template.*) ;; *) cp "$f" "$PROJ/$U/$d/";; esac
+  done
+done
 cpd Utilities/Fonts Utilities/Fonts '*'
 echo "Done."
