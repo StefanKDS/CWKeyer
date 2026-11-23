@@ -1,30 +1,25 @@
 # CWKeyer
 
-A simple CWKeyer for CW-Paddles based on a ESP8266 with WebInterface.  
+CWKeyer is a Morse code keyer project developed by **DL1SKD**. It includes two hardware implementations:
 
-SSID:     CWKeyer  
-PW:       123456789  
-Address:  192.168.4.2  
+- **ESP8266** — the original version for ESP8266-based hardware.
+- **STM32F746G-DISCO** — a version developed for the STM32F746G-DISCO board.
 
+Select a platform below to view its project-specific README and documentation.
 
-# Features
+## ESP8266
 
-- Adjustable speed in WPM and Farnsworth
-- Internal buzzer for sound output ( can be deactivated in software )
-- LineOut
-- 2 Memories for 128 char's each
-- WebInterface for setting the memory and training data
-- CW Audio decoder ( Under 'Docs' you can find a 'How it works' )
+For details about the ESP8266 implementation, see the [**CWKeyer ESP8266 project page**](https://github.com/StefanKDS/CWKeyer/tree/ESP8266/CWKeyer_ESP8266).
 
-# Images
+## STM32F746G-DISCO
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Pictures/Keyer.jpg)
+For details about the STM32F746G-DISCO implementation, see the [**CWKeyer STM32F746G-DISCO project page**](https://github.com/StefanKDS/CWKeyer/tree/ESP8266/CWKeyer_F746/CWKeyer_F746).
 
-# PCB
-![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Pictures/PCB.jpg)
+The [**CWKeyer User Manual**](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/CWKeyer_F746/CWKeyer_F746/docs/CWKeyer_User_Manual.docx) provides additional information about operating the STM32 version. Screenshots are available in the [**screenshots folder**](https://github.com/StefanKDS/CWKeyer/tree/ESP8266/CWKeyer_F746/CWKeyer_F746/docs/screenshots).
 
-# Circuit
+---
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Circuit/Circuit.jpg?raw=true)
+*73 de DL1SKD*
+
 
 
