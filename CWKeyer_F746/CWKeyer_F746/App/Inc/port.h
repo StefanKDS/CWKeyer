@@ -44,5 +44,7 @@ void port_usb_drive(bool on);
 bool port_usb_active(void);
 /** true when a PC has mounted (configured) the drive */
 bool port_usb_host_connected(void);
+/** USB drive statistics (block accesses), for diagnostics on the display */
+void port_usb_stats(uint32_t *reads, uint32_t *writes, uint32_t *errors);
 
 #endif

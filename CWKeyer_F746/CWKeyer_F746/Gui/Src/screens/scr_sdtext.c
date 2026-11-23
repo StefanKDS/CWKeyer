@@ -58,6 +58,11 @@ static void frame(void)
                      COL_TEXT, ALIGN_CENTER);
             ui_label(R(PAD, y0 + 76, list_w, 18), &font_small, "Eject the drive on the PC,", COL_MUTED, ALIGN_CENTER);
             ui_label(R(PAD, y0 + 93, list_w, 18), &font_small, "then disconnect here", COL_MUTED, ALIGN_CENTER);
+            //uint32_t rd, wr, er;
+            //char st[48];
+            //port_usb_stats(&rd, &wr, &er);
+            //snprintf(st, sizeof st, "R %lu  W %lu  Err %lu", (unsigned long)rd, (unsigned long)wr, (unsigned long)er);
+            //ui_label(R(PAD, y0 + 166, list_w, 18), &font_small, st, er ? COL_ERR_TEXT : COL_MUTED, ALIGN_CENTER);
             if (ui_button(R(PAD, y0 + 118, list_w, 44), ICON_USB, "Disconnect", UI_FILLED))
             {
                 port_usb_drive(false);

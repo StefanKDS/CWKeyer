@@ -89,6 +89,8 @@ bool port_settings_save(const void *buf, size_t len)
  * The card is shared with the USB mass storage class, which accesses it from
  * the USB interrupt. Accesses from the main loop therefore mask that interrupt. */
 
+#define SD_XFER_TIMEOUT 1000u
+
 static volatile bool s_sd_ok;
 
 bool sd_card_ready(void)
@@ -117,25 +119,53 @@ bool port_sd_init(void)
     return ok;
 }
 
-bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t count)
+/**
+ * Block transfer SD <-> memory, used by the application and by USB MSC.
+ *
+ * The BSP reads/writes in polling mode: the CPU empties the 32 word SDMMC
+ * FIFO. At 24 MHz / 4 bit the FIFO fills within ~10 us, so any interrupt
+ * during the transfer (audio DMA, SysTick) causes an RX overrun / TX
+ * underrun and the transfer fails. Therefore interrupts are blocked during
+ * the data phase only (8 blocks = approx. 0.4 ms, the audio buffer lasts
+ * 4 ms, so nothing is lost). Waiting for the card to finish programming
+ * after a write happens with interrupts enabled.
+ */
+bool sd_transfer(bool write, uint8_t *buf, uint32_t lba, uint32_t count)
 {
-    if (!s_sd_ok || usb_device_active())
+    if (!s_sd_ok)
         return false;
-    bool ok = false;
-    HAL_NVIC_DisableIRQ(OTG_FS_IRQn);
-    if (BSP_SD_ReadBlocks((uint32_t *)(void *)buf, lba, count, 1000) == MSD_OK)
+
+    for (int attempt = 0; attempt < 3; attempt++)
     {
+        uint32_t pm = __get_PRIMASK();
+        __disable_irq();
+        uint8_t r = write ? BSP_SD_WriteBlocks((uint32_t *)(void *)buf, lba, count, SD_XFER_TIMEOUT)
+                          : BSP_SD_ReadBlocks((uint32_t *)(void *)buf, lba, count, SD_XFER_TIMEOUT);
+        if (pm == 0)
+            __enable_irq();
+
         uint32_t t0 = HAL_GetTick();
-        ok = true;
+        bool ok = (r == MSD_OK);
         while (BSP_SD_GetCardState() != SD_TRANSFER_OK)
         {
-            if (HAL_GetTick() - t0 > 1000u)
+            if (HAL_GetTick() - t0 > 2000u)
             {
                 ok = false;
                 break;
             }
         }
+        if (ok)
+            return true;
     }
+    return false;
+}
+
+bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t count)
+{
+    if (usb_device_active())
+        return false;
+    HAL_NVIC_DisableIRQ(OTG_FS_IRQn);
+    bool ok = sd_transfer(false, buf, lba, count);
     HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
     return ok;
 }
@@ -155,4 +185,13 @@ bool port_usb_active(void)
 bool port_usb_host_connected(void)
 {
     return usb_device_configured();
+}
+
+extern volatile uint32_t g_msc_reads, g_msc_writes, g_msc_errors;
+
+void port_usb_stats(uint32_t *reads, uint32_t *writes, uint32_t *errors)
+{
+    *reads  = g_msc_reads;
+    *writes = g_msc_writes;
+    *errors = g_msc_errors;
 }

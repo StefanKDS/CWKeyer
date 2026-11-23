@@ -44,6 +44,7 @@ static bool s_usb;
 void port_usb_drive(bool on) { s_usb = on; }
 bool port_usb_active(void) { return s_usb; }
 bool port_usb_host_connected(void) { return s_usb; }
+void port_usb_stats(uint32_t *r, uint32_t *w, uint32_t *e) { *r = 1234; *w = 56; *e = 0; }
 bool port_sd_read(uint32_t lba, uint8_t *buf, uint32_t n)
 {
     fseek(img, (long)lba * 512, SEEK_SET);
