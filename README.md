@@ -22,7 +22,7 @@ The [**CWKeyer User Manual**](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/
 
 For details about the STM32F746G-DISCO implementation, see the [**CWKeyer STM32F746G-DISCO project page**](https://github.com/StefanKDS/CWKeyer/tree/ESP8266/CWKeyer_F746/CWKeyer_F746).
 
-The [**CWKeyer User Manual**](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/CWKeyer_F746/CWKeyer_F746/docs/CWKeyer_User_Manual.pdf) provides additional information about operating the STM32 version. Screenshots are available in the [**screenshots folder**](https://github.com/StefanKDS/CWKeyer/tree/ESP8266/CWKeyer_F746/CWKeyer_F746/docs/screenshots).
+The [**CWKeyer User Manual**](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/CWKeyer_F746/CWKeyer_F746/docs/CWKeyer_User_Manual.pdf) provides additional information about operating the STM32 version.
 
 ---
 
