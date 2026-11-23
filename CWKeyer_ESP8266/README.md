@@ -18,13 +18,13 @@ Address:  192.168.4.2
 
 # Images
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Pictures/Keyer.jpg)
+![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/CWKeyer_ESP8266/Pictures/Keyer.jpg)
 
 # PCB
-![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Pictures/PCB.jpg)
+![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/CWKeyer_ESP8266/Pictures/PCB.jpg)
 
 # Circuit
 
-![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/Circuit/Circuit.jpg?raw=true)
+![plot](https://github.com/StefanKDS/CWKeyer/blob/ESP8266/CWKeyer_ESP8266/Circuit/Circuit.jpg?raw=true)
 
 
