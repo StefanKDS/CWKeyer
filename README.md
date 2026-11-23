@@ -1,6 +1,11 @@
 # CWKeyer
 
-CWKeyer is a Morse code keyer project developed by **DL1SKD**. It includes two hardware implementations:
+CWKeyer is a Morse code keyer project developed by **DL1SKD**. 
+It's more a trainer than a real keyer, but the STM32 version has also a TX output.
+I started these project for me to learn CW.
+
+
+It includes two hardware implementations:
 
 - **ESP8266** — the original version for ESP8266-based hardware.
 - **STM32F746G-DISCO** — a version developed for the STM32F746G-DISCO board.
