@@ -9,7 +9,8 @@
  *      in pauses and causes false triggers with noisy receiver audio.
  *      Here a peak tracker (fast attack, slow release) and a noise
  *      floor tracker (fast down, slow up) are used; the threshold lies
- *      between both. Detection requires peak > squelch and SNR > 4.
+ *      between both. Detection requires peak > squelch, the current
+ *      magnitude > squelch and SNR > 4.
  *   3. hysteresis + glitch filter (state must be stable for 2 hops)
  *   4. timing: dit/dah separation with running averages of dit and
  *      dah length (ESP version: dit average only), letter gap > 2 dits, word gap
@@ -169,7 +170,10 @@ static void detect(void)
 {
     const float t = now_ms();
 
-    bool raw = s_valid && (s_filtered ? (s_mag > s_thr_off) : (s_mag > s_thr_on));
+    /* squelch: the current level must exceed the absolute squelch level,
+       otherwise noise bursts that are relative loud enough get decoded */
+    bool raw = s_valid && (s_mag > s_squelch) &&
+               (s_filtered ? (s_mag > s_thr_off) : (s_mag > s_thr_on));
     if (raw != s_raw)
     {
         s_raw = raw;
