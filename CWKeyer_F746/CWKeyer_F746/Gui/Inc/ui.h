@@ -54,6 +54,9 @@ void ui_progress(rect_t r, float fraction);
  *  otherwise the end of the text is shown. */
 void ui_textbox(rect_t r, const char *text, int len, color_t c, int highlight, bool cursor);
 
+/** Swipeable text area; set *first_line to -1 to follow the highlight again. */
+void ui_textbox_scroll(rect_t r, const char *text, int len, color_t c, int highlight, int *first_line);
+
 /** status bar, returns true when the back arrow was tapped */
 bool ui_statusbar(const char *title, bool back);
 

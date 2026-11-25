@@ -15,6 +15,7 @@
 #include "settings.h"
 #include "text_source.h"
 #include "trainer.h"
+#include "ui.h"
 
 static uint32_t s_ms;
 static FILE    *s_img;
@@ -83,6 +84,63 @@ static void shot(const char *name)
 
 #define EXPECT(cond, msg) do { if (!(cond)) { s_fails++; printf("FAIL: %s\n", msg); } else printf("ok: %s\n", msg); } while (0)
 
+static void textbox_frame(const char *text, int len, int hl, int *first, int x, int y, bool down)
+{
+    touch_t t = { down, (int16_t)x, (int16_t)y };
+    gfx_begin(fb);
+    ui_frame_begin(&t, s_ms++);
+    ui_textbox_scroll(R(10, 40, 100, 100), text, len, COL_RX, hl, first);
+    ui_frame_end();
+}
+
+static void test_textbox_scroll(void)
+{
+    static char text[TEXT_BUF_SIZE + 1];
+    for (unsigned i = 0; i < TEXT_BUF_SIZE; i++)
+        text[i] = (i & 1u) ? ' ' : 'A';
+    text[TEXT_BUF_SIZE] = '\0';
+    int first = -1;
+
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 100, true);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 40, true);
+    EXPECT(first > 0, "swiping up scrolls text down");
+    int scrolled = first;
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 40, false);
+    textbox_frame(text, TEXT_BUF_SIZE, TEXT_BUF_SIZE - 1, &first, 0, 0, false);
+    EXPECT(first == scrolled, "manual scroll stays in place as playback advances");
+
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 60, true);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 130, true);
+    EXPECT(first < scrolled, "swiping down scrolls text up");
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 130, false);
+
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 100, true);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, -30000, true);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, -30000, false);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, 100, true);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, -30000, true);
+    textbox_frame(text, TEXT_BUF_SIZE, 0, &first, 30, -30000, false);
+    EXPECT(first > 1200, "long texts remain scrollable beyond 1200 lines");
+    int end = first;
+    first = -1;
+    textbox_frame(text, TEXT_BUF_SIZE, TEXT_BUF_SIZE - 1, &first, 0, 0, false);
+    textbox_frame(text, TEXT_BUF_SIZE, TEXT_BUF_SIZE - 1, &first, 30, 100, true);
+    textbox_frame(text, TEXT_BUF_SIZE, TEXT_BUF_SIZE - 1, &first, 30, -30000, true);
+    EXPECT(first >= end && first > 1200, "scrolling clamps at the end of the text");
+    textbox_frame(text, TEXT_BUF_SIZE, TEXT_BUF_SIZE - 1, &first, 30, -30000, false);
+    textbox_frame("SHORT", 5, 0, &first, 0, 0, false);
+    EXPECT(first == 0, "shorter text clamps the scroll position");
+}
+
+static uint32_t sd_text_pixels(void)
+{
+    uint32_t hash = 2166136261u;
+    for (int y = 38; y < 200; y++)
+        for (int x = 188; x < 472; x++)
+            hash = (hash ^ fb[y * LCD_W + x]) * 16777619u;
+    return hash;
+}
+
 int main(int argc, char **argv)
 {
     if (argc > 1) s_out = argv[1];
@@ -90,6 +148,7 @@ int main(int argc, char **argv)
     srand(3);
 
     app_init();
+    test_textbox_scroll();
     g_settings.wpm = 18; g_settings.fwpm = 12; app_apply_settings();
     text_source_scan();
     gui_init();
@@ -156,7 +215,20 @@ int main(int argc, char **argv)
     tap(80, 200);
     EXPECT(screen_current() == SCR_SDTEXT, "tap tile SD-Texte");
     tap(80, 60);                        /* first file */
-    tap(290, 250);                      /* play */
+    if (text_source_len() > 500)
+    {
+        uint32_t start = sd_text_pixels();
+        frame(300, 180, true);
+        frame(300, 70, true);
+        frame(300, 70, false);
+        EXPECT(sd_text_pixels() != start, "swiping the SD text box changes the displayed text");
+        tap(290, 250);                  /* play restores following */
+        EXPECT(sd_text_pixels() == start, "starting playback returns to the beginning");
+    }
+    else
+    {
+        tap(290, 250);                  /* play */
+    }
     idle(60);
     shot("09_sdtext");
     tap(160, 244);                      /* USB drive on */

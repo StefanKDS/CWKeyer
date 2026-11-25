@@ -151,6 +151,8 @@ is copied to the display buffer when rotated (~1 ms); Touch coordinates are mirr
 * FAT16 or FAT32 (exFAT is not supported), files `*.txt` in the main directory or in the folder `CW/`.
 * Up to 16 KiB per file. Umlauts (UTF-8 or Latin-1) become AE/OE/UE/SS, lowercase letters
   Uppercase letters, non-sendable characters are omitted.
+* Swipe up or down in the text box to browse the text. Starting or restarting playback
+  returns the display to the current playback position.
 * Examples: `SD_Card_Examples/CW/`. Card can be swapped during operation.
 
 ## Storage layout

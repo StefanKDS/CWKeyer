@@ -269,27 +269,18 @@ void ui_progress(rect_t r, float f)
 
 /* ---- word wrapped text ------------------------------------------- */
 
-#define MAX_LINES 1200
-static uint16_t s_line_start[MAX_LINES];
-
-static int wrap_lines(const char *t, int len, int cols)
+static int next_line(const char *t, int len, int cols, int pos)
 {
-    int n = 0, pos = 0;
-    while (pos < len && n < MAX_LINES)
-    {
-        s_line_start[n++] = (uint16_t)pos;
-        if (len - pos <= cols) break;
-        int brk = pos + cols;                   /* break at last space */
-        int sp = brk;
-        while (sp > pos && t[sp] != ' ') sp--;
-        pos = (sp > pos) ? sp + 1 : brk;
-    }
-    if (n == 0) s_line_start[n++] = 0;
-    return n;
+    if (len - pos <= cols) return len;
+    int brk = pos + cols;
+    int sp = brk;
+    while (sp > pos && t[sp] != ' ') sp--;
+    return (sp > pos) ? sp + 1 : brk;
 }
 
-void ui_textbox(rect_t r, const char *text, int len, color_t c, int hl, bool cursor)
+static void textbox(rect_t r, const char *text, int len, color_t c, int hl, bool cursor, int *scroll)
 {
+    static int drag_first;
     gfx_rrect(r, 6, COL_TEXTAREA, COL_BORDER, 1);
     const font_t *f = &font_mono;
     int cw = f->glyphs[0].adv ? f->glyphs[0].adv : 12;  /* mono: all equal (space) */
@@ -299,26 +290,69 @@ void ui_textbox(rect_t r, const char *text, int len, color_t c, int hl, bool cur
     int rows = in.h / lh;
     if (cols < 1 || rows < 1) return;
 
-    int n = wrap_lines(text, len, cols);
+    int n = 0, hl_line = 0, start = 0;
+    do
+    {
+        if (start <= hl) hl_line = n;
+        n++;
+        start = next_line(text, len, cols, start);
+    } while (start < len);
+
+    int max_first = n > rows ? n - rows : 0;
     int first;
     if (hl >= 0)
     {
-        int l = 0;
-        while (l + 1 < n && s_line_start[l + 1] <= hl) l++;
-        first = l - 1;                               /* one line of context */
-        if (first > n - rows) first = n - rows;
+        first = hl_line - 1;                         /* one line of context */
     }
     else
     {
-        first = n - rows;
+        first = max_first;
     }
     if (first < 0) first = 0;
+    if (first > max_first) first = max_first;
+
+    if (scroll)
+    {
+        int id = ++s_id;
+        if (*scroll >= 0)
+        {
+            if (*scroll > max_first) *scroll = max_first;
+            first = *scroll;
+        }
+        if (s_pressed && rect_contains(r, s_down_x, s_down_y))
+        {
+            s_active = id;
+            drag_first = first;
+        }
+        if (s_active == id && s_t.down)
+        {
+            int delta = (s_down_y - s_t.y) / lh;
+            if (delta != 0 || *scroll >= 0)
+            {
+                first = drag_first + delta;
+                if (first < 0) first = 0;
+                if (first > max_first) first = max_first;
+                *scroll = first;
+            }
+        }
+        if (max_first > 0)
+        {
+            int bar_h = in.h * rows / n;
+            if (bar_h < 8) bar_h = 8;
+            int bar_y = in.y + (in.h - bar_h) * first / max_first;
+            gfx_fill_rrect(R(r.x + r.w - 5, bar_y, 3, bar_h), 1, COL_MUTED);
+        }
+    }
 
     gfx_set_clip(in);
+    start = 0;
+    for (int i = 0; i < first; i++)
+        start = next_line(text, len, cols, start);
     for (int i = 0; i < rows && first + i < n; i++)
     {
-        int s = s_line_start[first + i];
-        int e = (first + i + 1 < n) ? s_line_start[first + i + 1] : len;
+        int s = start;
+        int e = next_line(text, len, cols, s);
+        start = e;
         int y = in.y + i * lh;
         if (hl >= s && hl < e)
         {
@@ -341,6 +375,16 @@ void ui_textbox(rect_t r, const char *text, int len, color_t c, int hl, bool cur
         }
     }
     gfx_reset_clip();
+}
+
+void ui_textbox(rect_t r, const char *text, int len, color_t c, int hl, bool cursor)
+{
+    textbox(r, text, len, c, hl, cursor, NULL);
+}
+
+void ui_textbox_scroll(rect_t r, const char *text, int len, color_t c, int hl, int *first_line)
+{
+    textbox(r, text, len, c, hl, false, first_line);
 }
 
 /* ---- status bar --------------------------------------------------- */

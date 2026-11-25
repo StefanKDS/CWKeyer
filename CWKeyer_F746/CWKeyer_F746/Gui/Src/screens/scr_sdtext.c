@@ -13,6 +13,7 @@
 static int  s_sel   = -1;
 static int  s_first = 0;
 static bool s_hide;            /* hide text while playing (copy practice) */
+static int  s_text_first = -1;
 
 static void enter(void)
 {
@@ -20,6 +21,7 @@ static void enter(void)
     if (text_source_status() != TS_READY)
         text_source_scan();
     s_sel = text_source_loaded_index();
+    s_text_first = -1;
 }
 
 static void leave(void)
@@ -31,7 +33,10 @@ static void select_file(int i)
 {
     app_stop_playback();
     if (text_source_load(i))
+    {
         s_sel = i;
+        s_text_first = -1;
+    }
 }
 
 static void frame(void)
@@ -126,7 +131,8 @@ static void frame(void)
     }
     else if (loaded)
     {
-        ui_textbox(R(x, y0, w, text_h), text_source_text(), (int)text_source_len(), COL_RX, pos < 0 ? 0 : pos, false);
+        ui_textbox_scroll(R(x, y0, w, text_h), text_source_text(), (int)text_source_len(), COL_RX,
+                          pos < 0 ? 0 : pos, &s_text_first);
     }
     else
     {
@@ -142,12 +148,18 @@ static void frame(void)
     int b = (w - 3 * 6) / 4;
     uint32_t dis = loaded ? 0 : UI_DISABLED;
     if (ui_button(R(x, by, b, bh), ICON_SKIP_BACK, NULL, dis))
+    {
+        s_text_first = -1;
         app_play_text(text_source_text(), text_source_len(), false);
+    }
     if (ui_button(R(x + (b + 6), by, b, bh), (playing && !player_paused()) ? ICON_PAUSE : ICON_PLAY, NULL,
                   dis | ((playing && !player_paused()) ? UI_ACCENT : 0)))
     {
         if (!playing)
+        {
+            s_text_first = -1;
             app_play_text(text_source_text(), text_source_len(), false);
+        }
         else
             player_pause(!player_paused());
     }
