@@ -97,7 +97,7 @@ void ShowTrainerHearScreen()
   }
 
   buf[5] = '\0';
-  startPlayback(String(buf));
+  startPlayback(String(buf), false);
   display.print(buf, 4, 5);
 
   decoderString = "";  // Clear decoder buffer
@@ -127,7 +127,7 @@ void ShowTrainerListenRepeatScreen()
   char buf[2] = { currentTrainerLetter, '\0' };
   display.printChar16(currentTrainerLetter, 3, 7);
 
-  startPlayback(String(buf));  // Play the letter
+  startPlayback(String(buf), false);  // Play the letter
 
   DEBUG_PRINT("SelectedLetters: ");
   DEBUG_PRINTLN(selectedLetters);
@@ -216,13 +216,18 @@ void ShowSetupScreen()
   else
     display.print("Settings OFF", 3,4);
     
-  display.print("Farnsworth", 4,4);
+  if(txKeyOn == true)
+    display.print("TX output ON ", 4,4);
+  else
+    display.print("TX output OFF", 4,4);
+
+  display.print("Farnsworth", 5,4);
 
   char string[20];
   snprintf(string, sizeof(string), "FW: %i WPM", fwpm);
-  display.print(string, 6,2);
+  display.print(string, 7,2);
 
-  display.print("Back", 5,4);
+  display.print("Back", 6,4);
   display.print(">", 2,1);  // Selection arrow
 }
 

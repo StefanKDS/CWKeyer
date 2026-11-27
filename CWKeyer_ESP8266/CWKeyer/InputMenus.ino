@@ -239,6 +239,22 @@ void ReactOnButtonClick()
       return;
     }
 
+    if(selected_menu_item == SETUP_TX_KEY)
+    {
+      SwitchTxKey(!txKeyOn);
+      if(txKeyOn)
+      {
+        display.print("TX output ON ", 4,4);
+        DEBUG_PRINTLN("TX output ON");
+      }
+      else
+      {
+        display.print("TX output OFF", 4,4);
+        DEBUG_PRINTLN("TX output OFF");
+      }
+      return;
+    }
+
     if(selected_menu_item == SETUP_FARNSWORTH && fspeed_mode == false)
     {
       fspeed_mode = true;  // Enable Farnsworth speed adjustment

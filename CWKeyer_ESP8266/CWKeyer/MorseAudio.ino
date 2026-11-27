@@ -16,6 +16,20 @@ void SwitchSpeaker(byte value)
   EEPROM.commit();  // Write to EEPROM
 }
 
+void SwitchTxKey(byte value)
+{
+  txKeyOn = (value == 1);
+  digitalWrite(TX_KEY_PIN, txKeyOn && txKeyActive ? HIGH : LOW);
+  EEPROM.write(EEPROM_TX_KEY_ADDR, txKeyOn);
+  EEPROM.commit();
+}
+
+void SetTxKeyActive(bool active)
+{
+  txKeyActive = active;
+  digitalWrite(TX_KEY_PIN, txKeyOn && txKeyActive ? HIGH : LOW);
+}
+
 /////////////////////////////////////////////////////////////////
 /// SwitchSettings() - Enable or Disable WiFi and Web Server
 // Enables WiFi connection and starts access point for
@@ -70,6 +84,8 @@ void ProcessBeep(short beepoLength, char outputChar)
 {
     tone(SPEAKER_PIN, 1000);   // Start 1000 Hz tone
 
+    SetTxKeyActive(true);
+
     // Turn on buzzer if enabled
     if(speakerOn) 
     {
@@ -89,7 +105,7 @@ void ProcessBeep(short beepoLength, char outputChar)
 void ProcessSign(char sign)
 {
   // Start playback of single character (e.g. 'A' -> ".-")
-  startPlayback(String(sign));
+  startPlayback(String(sign), false);
 }
 
 /////////////////////////////////////////////////////////////////
@@ -108,7 +124,7 @@ void PlayMemory(byte addr)
     return;
 
   // Start non-blocking playback
-  startPlayback(text);
+  startPlayback(text, true);
 }
 
 /////////////////////////////////////////////////////////////////

@@ -17,6 +17,8 @@
 void CalculateTimes(char wpm, char fwpm);  // Calculate timing values based on WPM
 String ReadTextFromEEPROM(byte addr);      // Read string from EEPROM at specified address
 void SwitchSpeaker(byte value);            // Enable/disable buzzer output
+void SwitchTxKey(byte value);              // Enable/disable transmitter key output
+void SetTxKeyActive(bool active);          // Set key output state for current element
 void WriteTextToEEPROM(byte addr, String text);  // Write string to EEPROM at specified address
 void ShowMainScreen();                     // Display main menu screen
 void ShowSetupScreen();                    // Display setup/configuration screen
@@ -27,9 +29,9 @@ void rotate(Rotary& r);                    // Handle rotary encoder rotation
 void ReactOnButtonClick();                 // Handle mode button click
 void ProcessBeep(short beepoLength, char outputChar);  // Start a beep tone
 void ProcessSign(char sign);               // Play a single character as Morse code
-void startBeep(unsigned int length, char symbol);     // Start non-blocking beep
+void startBeep(unsigned int length, char symbol, bool keyTx); // Start non-blocking beep
 void updateBeep();                         // Update beep state (non-blocking)
-void startPlayback(String text);           // Start playback of stored text
+void startPlayback(String text, bool keyTx); // Start playback of stored text
 void updatePlayback();                     // Update playback state (non-blocking)
 
 /////////////////////////////////////////////////////////////////
@@ -79,6 +81,9 @@ char fwpm = wpm;                // Farnsworth speed (for extended pauses)
 bool speed_mode = false;        // true = Encoder for changing WPM speed
 bool fspeed_mode = false;       // true = Encoder for changing Farnsworth speed
 bool speakerOn = true;          // true = Buzzer is enabled
+bool txKeyOn = false;           // true = transmitter key output is enabled
+bool txKeyActive = false;       // true while a keying element is active
+bool playbackKeyTx = false;     // true when current playback should key TX
 bool settingsOn = false;        // true = WiFi/Web-Server is enabled
 double key_activated;           // Timestamp of last key press
 short char_on_screen = -1;      // Number of characters displayed on screen

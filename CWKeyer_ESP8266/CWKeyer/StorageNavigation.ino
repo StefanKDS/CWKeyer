@@ -157,7 +157,7 @@ void rotate(Rotary& r)
 
     char string[20];
     snprintf(string, sizeof(string), "FW: %i WPM", fwpm);
-    display.print(string, 6,2);
+    display.print(string, 7,2);
 
     CalculateTimes(wpm, fwpm);  // Recalculate all timing
     EEPROM.write(EEPROM_FWPM_ADDR, fwpm);  // Save to EEPROM

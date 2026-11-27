@@ -12,6 +12,7 @@
 #define SPEAKER_PIN 14 //D5
 #define SCL 5 //D1
 #define SDA 4 //D2
+#define TX_KEY_PIN 3 // RX / GPIO3, transmitter key output
 #define NO_KEY 999
 
 #define CLICKS_PER_STEP   4 
@@ -27,6 +28,7 @@
 #define EEPROM_MEM2_ADDR 129   // 128 byte
 #define EEPROM_SPEAKER_ADDR 258 // 1 byte
 #define EEPROM_FWPM_ADDR 259 // 1 byte
+#define EEPROM_TX_KEY_ADDR 257 // 1 byte
 ///////////////////////
 
 // STATES ///////////////
@@ -50,11 +52,12 @@
 ///////////////////////
 
 // SETUP MENU /////////
-#define SETUP_MENU_COUNT 4
+#define SETUP_MENU_COUNT 5
 #define SETUP_SPEAKER 1
 #define SETUP_SETTINGS 2
-#define SETUP_FARNSWORTH 3
-#define SETUP_BACK 4
+#define SETUP_TX_KEY 3
+#define SETUP_FARNSWORTH 4
+#define SETUP_BACK 5
 ///////////////////////
 
 // SETUP CW_KEYER /////////

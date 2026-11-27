@@ -15,6 +15,10 @@ void setup()
   // ===== WiFi and Server initially OFF =====
   SwitchSettings(0);
 
+  // Keep the transmitter unkeyed during startup.
+  pinMode(TX_KEY_PIN, OUTPUT);
+  digitalWrite(TX_KEY_PIN, LOW);
+
   // ===== EEPROM Initialization =====
   DEBUG_PRINTLN("- EEPROM INIT -");
   EEPROM.begin(EEPROM_SIZE);
@@ -61,6 +65,10 @@ void setup()
   DEBUG_PRINTLN(value, DEC);
   SwitchSpeaker((byte)value);
 
+  // Uninitialized EEPROM (0xFF) keeps TX output disabled by default.
+  value = EEPROM.read(EEPROM_TX_KEY_ADDR);
+  SwitchTxKey(value == 1);
+
   // Load letter selection for trainer
   selectedLetters = ReadTextFromEEPROM(0x40);
 
@@ -101,10 +109,12 @@ void setup()
 // Tone is played non-blockingly - function returns immediately
 // and updateBeep() manages the tone ending
 /////////////////////////////////////////////////////////////////
-void startBeep(unsigned int length, char symbol)
+void startBeep(unsigned int length, char symbol, bool keyTx)
 {
   noTone(SPEAKER_PIN);        // Ensure no old tone is running
   tone(SPEAKER_PIN, 1000);    // Start 1000 Hz tone on speaker
+
+  SetTxKeyActive(keyTx);
 
   if (speakerOn)              // If buzzer is enabled
     digitalWrite(BUZZER_PIN, HIGH);  // Turn on buzzer too
@@ -129,6 +139,7 @@ void updateBeep()
   {
     noTone(SPEAKER_PIN);      // Turn off speaker tone
     digitalWrite(BUZZER_PIN, LOW);  // Turn off buzzer
+    SetTxKeyActive(false);
     beeping = false;
 
     // Automatically start pause after tone (1T)
@@ -148,13 +159,14 @@ void updateBeep()
 /// startPlayback() - Start Text Playback
 // Initializes playback of stored text as Morse code
 /////////////////////////////////////////////////////////////////
-void startPlayback(String text)
+void startPlayback(String text, bool keyTx)
 {
   playbackText = text;
   playbackIndex = 0;
   currentMorse = "";
   morseIndex = 0;
   playing = true;
+  playbackKeyTx = keyTx;
   nextActionTime = millis(); // Start immediately
 }
 
@@ -205,7 +217,7 @@ void updatePlayback()
   {
     char sym = currentMorse[morseIndex++];  // Current symbol ('.' or '-')
     unsigned int len = (sym == '.') ? dit_len : dah_len;  // Length based on symbol
-    startBeep(len, sym);  // Start beep
+    startBeep(len, sym, playbackKeyTx);  // Start beep
     // After beep: wait for beep length + 1T (elementGap) for next symbol
     nextActionTime = now + len + elementGap;
   }
