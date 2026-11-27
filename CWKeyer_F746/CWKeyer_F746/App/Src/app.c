@@ -75,7 +75,8 @@ void app_apply_settings(void)
     settings_t *s = &g_settings;
 
     settings_sanitize(s);
-    morse_timing_calc(&t, s->wpm, s->fwpm);
+    uint8_t fwpm = s_mode == APP_MODE_KEYER ? s->wpm : s->fwpm;
+    morse_timing_calc(&t, s->wpm, fwpm);
     keyer_configure(&t, s->keyer_mode, s->paddle_swap != 0, s->debounce_ms);
     player_set_timing(&t);
     cw_decoder_configure(s->dec_freq_hz, s->dec_squelch);

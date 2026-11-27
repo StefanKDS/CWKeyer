@@ -15,6 +15,13 @@
 static void enter(void)
 {
     app_set_mode(APP_MODE_KEYER);
+    app_apply_settings();
+}
+
+static void leave(void)
+{
+    app_set_mode(APP_MODE_IDLE);
+    app_apply_settings();
 }
 
 static void frame(void)
@@ -93,4 +100,4 @@ static void frame(void)
     ui_label(R(rx, ry, right_w, 22), &font_mono, pat, COL_ACCENT, ALIGN_CENTER);
 }
 
-const screen_t scr_keyer = { enter, frame, NULL };
+const screen_t scr_keyer = { enter, frame, leave };

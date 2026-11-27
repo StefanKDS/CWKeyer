@@ -23,7 +23,7 @@ with touch controls, audio via the WM8994 codec, and practice texts from SD card
 | Decoder over A0 (Goertzel, 8.9 kHz) | Decoder via line-in (blue) of the codec, 16 kHz, Goertzel + adaptive threshold, WPM display, level display |
 | 2 Storage (website) | 3 memory M1–M3, editing with on-screen keyboard |
 | Coach letters (website) | Character selection A–Z, 0–9, `. , / ? =` + cooking lessons |
-| Farnsworth on Encoder | all settings in "Settings" (tempo, audio, keyer, decoder, texts, info) |
+| Farnsworth spacing | configurable in "Settings"; automatically disabled in Keyer mode |
 | EEPROM | Internal flash, Sector 7, with wear leveling |
 | – | Practice texts `*.txt` from SD card, playback with follow-along marker or hidden (note-taking) |
 | – | Power via **USB FS (CN13), **SD card at the push of a button as a USB drive on the PC – copy texts directly |

@@ -430,11 +430,12 @@ bool ui_statusbar(const char *title, bool back)
     int ty = (BAR_H - font_small.height) / 2;
     if (g_settings.fwpm < g_settings.wpm)
     {
+        bool fw_enabled = app_mode() != APP_MODE_KEYER;
         snprintf(buf, sizeof buf, "%u", g_settings.fwpm);
         rx -= 10 + gfx_text_width(&font_bold, buf);
-        gfx_text(&font_bold, rx, ty - 1, buf, COL_ACCENT);
+        gfx_text(&font_bold, rx, ty - 1, buf, fw_enabled ? COL_ACCENT : COL_DISABLED);
         rx -= 4 + gfx_text_width(&font_small, "FW");
-        gfx_text(&font_small, rx, ty, "FW", COL_MUTED);
+        gfx_text(&font_small, rx, ty, "FW", fw_enabled ? COL_MUTED : COL_DISABLED);
     }
     snprintf(buf, sizeof buf, "%u", g_settings.wpm);
     rx -= 10 + gfx_text_width(&font_bold, buf);
