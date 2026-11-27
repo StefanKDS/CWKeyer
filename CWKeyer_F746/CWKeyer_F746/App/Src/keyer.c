@@ -142,13 +142,18 @@ void keyer_tick(void)
     }
 
     /* ---- straight key (D4): direct keying + duration based decoding --- */
-    bool sk_new = debounce(&s_sk, port_straight_key());
-    if (sk_new && !s_sk_down && s_state == KS_IDLE)
+    debounce(&s_sk, port_straight_key());
+    /* Level based start: a press that arrives while a gap is still running
+       (human gaps are often shorter than one dit) must not be lost, else
+       elements are missing and wrong characters / '*' are decoded. */
+    if (s_sk.stable && !s_sk_down && s_state != KS_ELEMENT)
     {
-        s_sk_down   = true;
-        s_sk_time   = 0;
-        s_tone      = true;
+        s_sk_down    = true;
+        s_sk_time    = 0;
+        s_tone       = true;
         s_space_sent = false;
+        s_state      = KS_IDLE;
+        s_pend_dit   = s_pend_dah = false;
     }
     if (s_sk_down)
     {
@@ -158,8 +163,8 @@ void keyer_tick(void)
             s_sk_down = false;
             s_tone    = false;
             add_element(s_sk_time < 2u * s_t.dit ? MORSE_DOT : MORSE_DASH);
-            s_state   = KS_GAP;
-            s_timer   = s_t.elem_gap;
+            s_state   = KS_IDLE;      /* letter / word gap is timed from now */
+            s_idle    = 0;
         }
         return;
     }
