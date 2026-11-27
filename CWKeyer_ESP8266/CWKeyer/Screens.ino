@@ -217,9 +217,9 @@ void ShowSetupScreen()
     display.print("Settings OFF", 3,4);
     
   if(txKeyOn == true)
-    display.print("TX output ON ", 4,4);
+    display.print("TX ON ", 4,4);
   else
-    display.print("TX output OFF", 4,4);
+    display.print("TX OFF", 4,4);
 
   display.print("Farnsworth", 5,4);
 

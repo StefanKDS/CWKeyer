@@ -244,13 +244,13 @@ void ReactOnButtonClick()
       SwitchTxKey(!txKeyOn);
       if(txKeyOn)
       {
-        display.print("TX output ON ", 4,4);
-        DEBUG_PRINTLN("TX output ON");
+        display.print("TX ON ", 4,4);
+        DEBUG_PRINTLN("TX ON");
       }
       else
       {
-        display.print("TX output OFF", 4,4);
-        DEBUG_PRINTLN("TX output OFF");
+        display.print("TX OFF", 4,4);
+        DEBUG_PRINTLN("TX OFF");
       }
       return;
     }
